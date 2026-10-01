@@ -1,0 +1,83 @@
+/**
+ * Dynamic Filter Specifications & Options
+ * Consumed by: Filter Sidebar, Mobile Filter Drawer, Search & Collection Facets.
+ */
+
+export const FILTER_CRITERIA = {
+  categories: [
+    { label: "All Sarees", value: "all" },
+    { label: "Banarasi Silks", value: "banarasi" },
+    { label: "Kanjeevaram Pattu", value: "kanjeevaram" },
+    { label: "Yeola Paithani", value: "paithani" },
+    { label: "Patan Patola", value: "patola" },
+    { label: "Organza & Tissue", value: "organza" },
+    { label: "Pure Silk Georgette", value: "georgette" },
+    { label: "Khaddi Chiffon & Bandhani", value: "chiffon" },
+    { label: "Chanderi Handlooms", value: "chanderi" },
+    { label: "Tussar Silk", value: "tussar" },
+    { label: "Bridal Trousseau", value: "bridal" },
+  ],
+  occasions: [
+    { label: "All Occasions", value: "all" },
+    { label: "Wedding & Bridal", value: "wedding" },
+    { label: "Festive Celebrations", value: "festive" },
+    { label: "Cocktail & Reception", value: "reception" },
+    { label: "Party & Evening", value: "party" },
+    { label: "Haldi & Pooja", value: "haldi" },
+    { label: "Mehendi & Sangeet", value: "mehendi" },
+    { label: "Engagement & Roka", value: "engagement" },
+  ],
+  fabrics: [
+    { label: "All Fabrics", value: "all" },
+    { label: "Pure Mulberry Silk", value: "pure-silk" },
+    { label: "Pure Katan Silk", value: "katan-silk" },
+    { label: "Tissue Organza", value: "organza" },
+    { label: "Pure Silk Georgette", value: "georgette" },
+    { label: "Khaddi Chiffon", value: "chiffon" },
+    { label: "Chanderi Silk Cotton", value: "chanderi" },
+    { label: "Bhagalpuri Tussar Silk", value: "tussar-silk" },
+    { label: "Metallic Tissue Silk", value: "tissue" },
+    { label: "Micro Velvet & Silk", value: "velvet" },
+  ],
+  colors: [
+    { label: "All Colours", value: "all", hex: null },
+    { label: "Emerald Green", value: "emerald-green", hex: "#0D593F" },
+    { label: "Rani Pink", value: "pink", hex: "#C2185B" },
+    { label: "Midnight Blue", value: "royal-blue", hex: "#1A2A6C" },
+    { label: "Sindoor Red", value: "red", hex: "#B71C1C" },
+    { label: "Sunshine Yellow", value: "yellow", hex: "#FBC02D" },
+    { label: "Royal Violet", value: "purple", hex: "#4B0082" },
+    { label: "Champagne Gold", value: "gold", hex: "#D4AF37" },
+    { label: "Blush Peach", value: "peach", hex: "#FAD4C0" },
+    { label: "Turquoise Cyan", value: "turquoise", hex: "#008B8B" },
+    { label: "Rose Gold", value: "rose-gold", hex: "#B76E79" },
+    { label: "Obsidian Black", value: "black", hex: "#111111" },
+    { label: "Mint Pistachio", value: "pistachio", hex: "#93C572" },
+    { label: "Burgundy Maroon", value: "maroon", hex: "#4A0E17" },
+  ],
+  priceRanges: [
+    { label: "All Prices", min: 0, max: 1000000, value: "all" },
+    { label: "Under ₹25,000", min: 0, max: 25000, value: "under-25k" },
+    { label: "₹25,000 – ₹45,000", min: 25000, max: 45000, value: "25k-45k" },
+    { label: "₹45,000 – ₹70,000", min: 45000, max: 70000, value: "45k-70k" },
+    { label: "Above ₹70,000 (Bridal Vault)", min: 70000, max: 1000000, value: "above-70k" },
+  ],
+  discounts: [
+    { label: "All Items", minDiscount: 0, value: "all" },
+    { label: "10% & Above", minDiscount: 10, value: "10" },
+    { label: "15% & Above", minDiscount: 15, value: "15" },
+    { label: "20% & Above", minDiscount: 20, value: "20" },
+  ],
+  availability: [
+    { label: "All Items", value: "all" },
+    { label: "In Stock Only (Ready to Dispatch)", value: "in-stock" },
+  ],
+  sortOptions: [
+    { label: "Featured", value: "featured" },
+    { label: "Newest Arrivals", value: "newest" },
+    { label: "Price: Low to High", value: "price-low-high" },
+    { label: "Price: High to Low", value: "price-high-low" },
+    { label: "Best Selling", value: "bestselling" },
+    { label: "Customer Rating", value: "rating" },
+  ],
+};
