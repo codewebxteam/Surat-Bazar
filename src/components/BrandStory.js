@@ -36,12 +36,12 @@ export default function BrandStory() {
             </div>
 
             {/* Floating Silk Mark Certified Badge */}
-            <div className="absolute -bottom-4 -right-2 sm:right-6 bg-white p-3.5 sm:p-5 rounded-2xl shadow-xl border border-amber-900/15 max-w-[210px] sm:max-w-[230px] backdrop-blur-md z-10">
-              <div className="flex items-center gap-2 mb-1">
-                <Award className="w-4 h-4 sm:w-5 sm:h-5 text-[#9E7D2E]" />
-                <span className="text-[11px] sm:text-xs font-bold text-stone-900">Silk Mark Certified</span>
+            <div className="absolute bottom-3 right-3 sm:-bottom-4 sm:right-6 bg-white/95 sm:bg-white p-3 sm:p-5 rounded-2xl shadow-xl border border-amber-900/15 max-w-[190px] sm:max-w-[230px] backdrop-blur-md z-10">
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
+                <Award className="w-4 h-4 sm:w-5 sm:h-5 text-[#9E7D2E] shrink-0" />
+                <span className="text-[10px] sm:text-xs font-bold text-stone-900">Silk Mark Certified</span>
               </div>
-              <p className="text-[10px] sm:text-[11px] text-stone-500 leading-tight">
+              <p className="text-[9px] sm:text-[11px] text-stone-500 leading-tight">
                 Authentic 100% natural Mulberry & Katan silks guaranteed.
               </p>
             </div>

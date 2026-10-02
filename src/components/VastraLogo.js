@@ -116,12 +116,12 @@ export default function SuratbazarLogo({
   className = "" 
 }) {
   const isLight = variant === "light";
-  const emblemSize = size === "compact" ? 34 : size === "large" ? 48 : 42;
+  const emblemSize = size === "compact" ? 30 : size === "large" ? 44 : 38;
 
   return (
     <Link 
       href="/" 
-      className={`inline-flex items-center gap-2.5 sm:gap-3 group select-none ${className}`}
+      className={`inline-flex items-center gap-2 sm:gap-2.5 group select-none ${className}`}
       aria-label="Suratbazar - Home"
     >
       {/* Royal Saree / Textile S Emblem */}
@@ -130,8 +130,12 @@ export default function SuratbazarLogo({
       {/* Brand Text Block */}
       <div className="flex flex-col text-left">
         <span 
-          className={`font-serif-luxury font-bold tracking-[0.20em] uppercase transition-colors leading-none ${
-            size === "compact" ? "text-xl sm:text-2xl" : size === "large" ? "text-3xl sm:text-4xl" : "text-2xl sm:text-3xl"
+          className={`font-serif-luxury font-bold uppercase tracking-[0.14em] sm:tracking-[0.20em] transition-colors leading-none whitespace-nowrap ${
+            size === "compact" 
+              ? "text-lg sm:text-2xl" 
+              : size === "large" 
+                ? "text-2xl sm:text-3xl md:text-4xl" 
+                : "text-xl sm:text-2xl md:text-3xl"
           } ${
             isLight 
               ? "text-white group-hover:text-amber-300" 
@@ -142,8 +146,8 @@ export default function SuratbazarLogo({
         </span>
         {showTagline && (
           <span 
-            className={`uppercase tracking-[0.32em] font-semibold mt-1 transition-colors ${
-              size === "compact" ? "text-[7px]" : "text-[8px] sm:text-[9px]"
+            className={`uppercase tracking-[0.24em] sm:tracking-[0.32em] font-semibold mt-0.5 sm:mt-1 transition-colors whitespace-nowrap ${
+              size === "compact" ? "text-[6.5px] sm:text-[7.5px]" : "text-[7.5px] sm:text-[9px]"
             } ${
               isLight ? "text-amber-400/90" : "text-[#8C7355]"
             }`}
