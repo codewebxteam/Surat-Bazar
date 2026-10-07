@@ -9,9 +9,9 @@ export default function MobileBottomNav() {
   const pathname = usePathname();
   const { wishlist, isLoggedIn } = useCartWishlist();
 
-  // Hide the global mobile bottom nav on PDP (/product/*) and checkout (/checkout)
-  // because these pages render their own specialized full-width sticky conversion action bars
-  if (pathname.startsWith("/product/") || pathname.startsWith("/checkout")) {
+  // Hide the global mobile bottom nav on PDP (/product/*), checkout (/checkout), and admin panel (/admin)
+  // because these pages render their own specialized full-width navigation/action bars
+  if (pathname.startsWith("/product/") || pathname.startsWith("/checkout") || pathname.startsWith("/admin")) {
     return null;
   }
 
