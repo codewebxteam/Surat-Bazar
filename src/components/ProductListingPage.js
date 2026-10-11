@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { 
@@ -19,9 +19,10 @@ import {
   Layers,
   Sparkle
 } from "lucide-react";
-import { PRODUCTS } from "@/data/products";
 import { FILTER_CRITERIA } from "@/data/filters";
 import ProductCard from "@/components/ProductCard";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function ProductListingPage({
   title,
@@ -31,9 +32,31 @@ export default function ProductListingPage({
   filterType = "all",
   filterValue = null,
   breadcrumbs = [{ name: "Home", href: "/" }, { name: "Sarees", href: "/collections/sarees" }],
-  products = PRODUCTS,
   filterCriteria = FILTER_CRITERIA,
 }) {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [dynamicCategories, setDynamicCategories] = useState([]);
+
+  useEffect(() => {
+    async function fetchProducts() {
+      try {
+        const querySnapshot = await getDocs(collection(db, "products"));
+        const fetchedProducts = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setProducts(fetchedProducts);
+        
+        const catSnapshot = await getDocs(collection(db, "categories"));
+        const fetchedCats = catSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setDynamicCategories(fetchedCats);
+      } catch (error) {
+        console.error("Error fetching products:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchProducts();
+  }, []);
+
   // Filter States for all 7 required facets
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedPriceBracket, setSelectedPriceBracket] = useState("all");
@@ -62,19 +85,27 @@ export default function ProductListingPage({
     setOpenSections((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
-  // 1. Category facet definitions
-  const categoryOptions = useMemo(() => [
-    { id: "banarasi", name: "Banarasi Silks" },
-    { id: "kanjeevaram", name: "Kanjeevaram Pattu" },
-    { id: "paithani", name: "Yeola Paithani" },
-    { id: "patola", name: "Patan Patola" },
-    { id: "organza", name: "Organza & Tissue" },
-    { id: "georgette", name: "Silk Georgette" },
-    { id: "chiffon", name: "Khaddi Chiffon & Bandhani" },
-    { id: "chanderi", name: "Chanderi Handlooms" },
-    { id: "tussar", name: "Tussar Silk" },
-    { id: "bridal", name: "Bridal Trousseau" }
-  ], []);
+  // 1. Category facet definitions (Dynamic)
+  const categoryOptions = useMemo(() => {
+    const uniqueOptions = [];
+    const seenSlugs = new Set();
+    
+    dynamicCategories
+      .filter(cat => !cat.type || cat.type === "main" || cat.type === "sub" || cat.type === "collection")
+      .forEach(cat => {
+        if (!seenSlugs.has(cat.slug)) {
+          seenSlugs.add(cat.slug);
+          uniqueOptions.push({
+            id: cat.slug,
+            name: cat.name,
+            isSubcategory: cat.isSubcategory || cat.type === "sub",
+            parentCategory: cat.parentCategory
+          });
+        }
+      });
+      
+    return uniqueOptions;
+  }, [dynamicCategories]);
 
   // 2. Price Brackets
   const priceBrackets = useMemo(() => [
@@ -143,9 +174,9 @@ export default function ProductListingPage({
 
   // Main Filter Logic encompassing all 7 facets
   const filteredProducts = useMemo(() => {
-    return PRODUCTS.filter((item) => {
+    return products.filter((item) => {
       // 1. Initial Route Context Filter
-      if (filterType === "category" && filterValue && item.category !== filterValue) return false;
+      if (filterType === "category" && filterValue && item.category !== filterValue && item.subcategory !== filterValue) return false;
       if (filterType === "occasion" && filterValue && item.occasion !== filterValue) return false;
       if (filterType === "fabric" && filterValue && item.fabric !== filterValue) return false;
       if (filterType === "color" && filterValue && item.color !== filterValue) return false;
@@ -154,7 +185,7 @@ export default function ProductListingPage({
       if (filterType === "bestseller" && !item.isBestseller) return false;
 
       // 2. Facet 1: Category
-      if (selectedCategories.length > 0 && !selectedCategories.includes(item.category)) return false;
+      if (selectedCategories.length > 0 && !selectedCategories.includes(item.category) && !selectedCategories.includes(item.subcategory)) return false;
 
       // 3. Facet 2: Price
       if (selectedPriceBracket !== "all") {

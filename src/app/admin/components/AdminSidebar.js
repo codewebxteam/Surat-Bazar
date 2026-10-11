@@ -23,12 +23,12 @@ export default function AdminSidebar({ isMobileOpen, setIsMobileOpen }) {
 
   const navigation = [
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard, exact: true },
-    { name: "All Sarees", href: "/admin/products", icon: Package },
+    { name: "Categories", href: "/admin/categories", icon: Layers },
+    { name: "Sarees & Inventory", href: "/admin/products", icon: Package },
     { name: "Add New Saree", href: "/admin/products/new", icon: PlusCircle, highlight: true },
     { name: "Orders", href: "/admin/orders", icon: ShoppingBag, badge: "8 New" },
-    { name: "Inventory", href: "/admin/inventory", icon: Boxes, badge: "3 Low" },
     { name: "Customers", href: "/admin/customers", icon: Users },
-    { name: "Banners & Offers", href: "/admin/banners", icon: Layers },
+    { name: "Banners & Offers", href: "/admin/banners", icon: Sliders },
     { name: "Store Settings", href: "/admin/settings", icon: Settings },
   ];
 
@@ -143,7 +143,7 @@ export default function AdminSidebar({ isMobileOpen, setIsMobileOpen }) {
               </div>
             </div>
             <Link 
-              href="/account/login" 
+              href="/login" 
               title="Logout"
               className="p-1.5 rounded-lg text-stone-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
             >

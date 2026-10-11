@@ -4,10 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Layers, Search, Heart, User } from "lucide-react";
 import { useCartWishlist } from "@/context/CartWishlistContext";
+import { useAuth } from "@/context/AuthContext";
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
-  const { wishlist, isLoggedIn } = useCartWishlist();
+  const { wishlist } = useCartWishlist();
+  const { user } = useAuth();
 
   // Hide the global mobile bottom nav on PDP (/product/*), checkout (/checkout), and admin panel (/admin)
   // because these pages render their own specialized full-width navigation/action bars
@@ -20,7 +22,7 @@ export default function MobileBottomNav() {
     { label: "Collections", href: "/collections/sarees", icon: Layers },
     { label: "Search", href: "/search", icon: Search },
     { label: "Wishlist", href: "/wishlist", icon: Heart, badge: wishlist.length },
-    { label: "Account", href: isLoggedIn ? "/account" : "/account/login", icon: User },
+    { label: "Account", href: user ? "/account" : "/login", icon: User },
   ];
 
   return (

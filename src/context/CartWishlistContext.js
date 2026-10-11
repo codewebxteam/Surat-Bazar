@@ -1,61 +1,99 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useRef } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 const CartWishlistContext = createContext(null);
 
 export function CartWishlistProvider({ children }) {
+  const { user, loading: authLoading } = useAuth();
   const [cart, setCart] = useState([]);
   const [wishlist, setWishlist] = useState([]);
-  const [isLoggedIn, setIsLoggedIn] = useState(true); // Default logged in for smooth demo or configurable
-  const [user, setUser] = useState({ name: "Sanskriti Sharma", email: "sanskriti@example.com" });
   const [toastMessage, setToastMessage] = useState(null);
+  
+  // Keep track of whether data is loaded to prevent overwriting cloud data with empty array
+  const isInitialized = useRef(false);
 
-  // Load from localStorage on mount
+  // Load from localStorage on mount (Guest Mode)
   useEffect(() => {
-    try {
-      const savedCart = localStorage.getItem("suratbazar_cart") || localStorage.getItem("shringaar_cart");
-      if (savedCart) setCart(JSON.parse(savedCart));
+    if (!user && !authLoading) {
+      try {
+        const savedCart = localStorage.getItem("suratbazar_cart") || localStorage.getItem("shringaar_cart");
+        if (savedCart) setCart(JSON.parse(savedCart));
 
-      const savedWishlist = localStorage.getItem("suratbazar_wishlist") || localStorage.getItem("shringaar_wishlist");
-      if (savedWishlist) setWishlist(JSON.parse(savedWishlist));
-
-      const savedAuth = localStorage.getItem("suratbazar_auth") || localStorage.getItem("shringaar_auth");
-      if (savedAuth !== null) setIsLoggedIn(savedAuth === "true");
-    } catch (e) {
-      console.error("Failed to load cart/wishlist", e);
+        const savedWishlist = localStorage.getItem("suratbazar_wishlist") || localStorage.getItem("shringaar_wishlist");
+        if (savedWishlist) setWishlist(JSON.parse(savedWishlist));
+      } catch (e) {
+        console.error("Failed to load local cart/wishlist", e);
+      }
+      isInitialized.current = true;
     }
-  }, []);
+  }, [user, authLoading]);
 
-  const loginUser = (userData) => {
-    setIsLoggedIn(true);
-    if (userData) setUser(userData);
-    localStorage.setItem("suratbazar_auth", "true");
-    showToast("Logged in successfully! 👑");
-  };
-
-  const logoutUser = () => {
-    setIsLoggedIn(false);
-    localStorage.setItem("suratbazar_auth", "false");
-    showToast("Logged out of Suratbazar.");
-  };
-
-  // Save to localStorage
+  // Firestore Sync (Logged in Mode)
   useEffect(() => {
-    try {
-      localStorage.setItem("suratbazar_cart", JSON.stringify(cart));
-    } catch (e) {
-      console.error("Failed to save cart", e);
-    }
-  }, [cart]);
+    if (user) {
+      // Listen to Cart changes from Firestore
+      const unsubscribeCart = onSnapshot(doc(db, "carts", user.uid), (docSnap) => {
+        if (docSnap.exists()) {
+          setCart(docSnap.data().items || []);
+        } else {
+          setCart([]);
+        }
+        isInitialized.current = true; // Mark as initialized after first fetch
+      });
 
-  useEffect(() => {
-    try {
-      localStorage.setItem("suratbazar_wishlist", JSON.stringify(wishlist));
-    } catch (e) {
-      console.error("Failed to save wishlist", e);
+      // Listen to Wishlist changes from Firestore
+      const unsubscribeWishlist = onSnapshot(doc(db, "wishlists", user.uid), (docSnap) => {
+        if (docSnap.exists()) {
+          setWishlist(docSnap.data().items || []);
+        } else {
+          setWishlist([]);
+        }
+      });
+
+      return () => {
+        unsubscribeCart();
+        unsubscribeWishlist();
+      };
     }
-  }, [wishlist]);
+  }, [user]);
+
+  // Save Cart to LocalStorage OR Firestore whenever it changes
+  useEffect(() => {
+    if (!isInitialized.current) return; // Prevent saving empty initial state
+
+    if (user) {
+      // Save to Firestore
+      setDoc(doc(db, "carts", user.uid), { items: cart }).catch(console.error);
+    } else {
+      // Save to localStorage
+      try {
+        localStorage.setItem("suratbazar_cart", JSON.stringify(cart));
+      } catch (e) {
+        console.error("Failed to save cart locally", e);
+      }
+    }
+  }, [cart, user]);
+
+  // Save Wishlist to LocalStorage OR Firestore whenever it changes
+  useEffect(() => {
+    if (!isInitialized.current) return;
+
+    if (user) {
+      // Save to Firestore
+      setDoc(doc(db, "wishlists", user.uid), { items: wishlist }).catch(console.error);
+    } else {
+      // Save to localStorage
+      try {
+        localStorage.setItem("suratbazar_wishlist", JSON.stringify(wishlist));
+      } catch (e) {
+        console.error("Failed to save wishlist locally", e);
+      }
+    }
+  }, [wishlist, user]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -115,6 +153,10 @@ export function CartWishlistProvider({ children }) {
     return wishlist.some((item) => item.id === id);
   };
 
+  const clearCart = () => {
+    setCart([]);
+  };
+
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
   const cartSubtotal = cart.reduce((total, item) => total + item.price * item.quantity, 0);
 
@@ -128,13 +170,10 @@ export function CartWishlistProvider({ children }) {
         updateQuantity,
         toggleWishlist,
         isInWishlist,
+        clearCart,
         cartCount,
         cartSubtotal,
-        showToast,
-        isLoggedIn,
-        user,
-        loginUser,
-        logoutUser,
+        showToast
       }}
     >
       {children}

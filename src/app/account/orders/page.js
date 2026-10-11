@@ -1,48 +1,59 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Package, ArrowLeft, ChevronRight, ExternalLink, Truck, CheckCircle2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { useAuth } from "@/context/AuthContext";
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function OrdersPage() {
-  const mockOrders = [
-    {
-      id: "SHR-98421",
-      date: "28 Sep 2026",
-      status: "In Transit (Express Air)",
-      estimatedDelivery: "04 Oct 2026",
-      total: 38500,
-      paymentMethod: "UPI (Google Pay)",
-      items: [
-        {
-          name: "Rani Gulabi Katan Banarasi Kadwa Silk Saree",
-          image: "/products/banarasi.jpg",
-          blouse: "Custom Bridal Stitch (+₹2,500)",
-          qty: 1,
-          price: 38500,
-        }
-      ]
-    },
-    {
-      id: "SHR-91204",
-      date: "14 Aug 2026",
-      status: "Delivered",
-      estimatedDelivery: "18 Aug 2026",
-      total: 24999,
-      paymentMethod: "Credit Card (HDFC Visa)",
-      items: [
-        {
-          name: "Emerald Royale Scalloped Silk Georgette Saree",
-          image: "/products/georgette.jpg",
-          blouse: "Unstitched (Included)",
-          qty: 1,
-          price: 24999,
-        }
-      ]
+  const { user } = useAuth();
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchUserOrders() {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const q = query(
+          collection(db, "orders"),
+          where("userId", "==", user.uid)
+        );
+        const snapshot = await getDocs(q);
+        const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // Sort in memory by createdAt / date descending (newest first)
+        fetched.sort((a, b) => {
+          const timeA = a.createdAt?.seconds 
+            ? a.createdAt.seconds * 1000 
+            : a.createdAt?.toDate 
+            ? a.createdAt.toDate().getTime() 
+            : (new Date(a.date || 0).getTime() || 0);
+          const timeB = b.createdAt?.seconds 
+            ? b.createdAt.seconds * 1000 
+            : b.createdAt?.toDate 
+            ? b.createdAt.toDate().getTime() 
+            : (new Date(b.date || 0).getTime() || 0);
+          return timeB - timeA;
+        });
+
+        setOrders(fetched);
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+      } finally {
+        setLoading(false);
+      }
     }
-  ];
+    fetchUserOrders();
+  }, [user]);
+
 
   return (
     <>
@@ -70,57 +81,94 @@ export default function OrdersPage() {
           </div>
 
           <div className="space-y-6">
-            {mockOrders.map((order) => (
-              <div key={order.id} className="bg-white rounded-3xl border border-amber-900/10 p-6 sm:p-8 shadow-sm space-y-6">
-                
-                {/* Header info */}
-                <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-stone-100 text-xs">
-                  <div>
-                    <span className="text-stone-400 block text-[10px] uppercase tracking-wider">Order ID</span>
-                    <strong className="font-mono text-sm text-[#3E0C15]">{order.id}</strong>
-                  </div>
-                  <div>
-                    <span className="text-stone-400 block text-[10px] uppercase tracking-wider">Placed On</span>
-                    <span className="font-semibold text-stone-800">{order.date}</span>
-                  </div>
-                  <div>
-                    <span className="text-stone-400 block text-[10px] uppercase tracking-wider">Grand Total</span>
-                    <strong className="text-sm font-bold text-stone-900">₹{order.total.toLocaleString("en-IN")}</strong>
-                  </div>
-                  <div>
-                    <span className="px-3.5 py-1 bg-amber-100 text-[#3E0C15] font-bold rounded-full text-xs">
-                      {order.status}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Items */}
-                <div className="space-y-4">
-                  {order.items.map((item, idx) => (
-                    <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="relative w-20 h-24 rounded-2xl overflow-hidden bg-stone-100 border border-stone-200 shrink-0">
-                          <Image src={item.image} alt={item.name} fill className="object-cover" />
-                        </div>
-                        <div>
-                          <h3 className="font-serif-luxury text-base font-semibold text-stone-900">{item.name}</h3>
-                          <p className="text-xs text-stone-500 mt-0.5">{item.blouse}</p>
-                          <p className="text-xs font-bold text-[#3E0C15] mt-1">₹{item.price.toLocaleString("en-IN")} (Qty: {item.qty})</p>
-                        </div>
-                      </div>
-
-                      <Link
-                        href={`/account/orders/${order.id}`}
-                        className="px-6 py-2.5 rounded-full bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] text-xs font-bold transition-all shadow self-end sm:self-center"
-                      >
-                        View Order Details
-                      </Link>
-                    </div>
-                  ))}
-                </div>
-
+            {loading ? (
+              <div className="text-center py-12 text-stone-500">Loading orders...</div>
+            ) : orders.length === 0 ? (
+              <div className="bg-white rounded-3xl border border-amber-900/10 p-8 sm:p-12 text-center shadow-sm">
+                <Package className="w-12 h-12 text-stone-300 mx-auto mb-4" />
+                <h3 className="font-serif-luxury text-xl font-bold text-stone-900 mb-2">No Orders Found</h3>
+                <p className="text-stone-500 text-sm mb-6">You haven't placed any orders with us yet.</p>
+                <Link href="/collections" className="inline-flex px-6 py-2.5 bg-[#3E0C15] text-[#F7EFCF] text-xs font-bold uppercase tracking-wider rounded-full hover:bg-[#571520] transition-colors">
+                  Explore Collections
+                </Link>
               </div>
-            ))}
+            ) : (
+              orders.map((order) => {
+                const orderDateDisplay = order.date 
+                  ? order.date 
+                  : order.createdAt?.seconds 
+                  ? new Date(order.createdAt.seconds * 1000).toLocaleDateString("en-IN", { day: '2-digit', month: 'short', year: 'numeric' }) 
+                  : order.createdAt?.toDate 
+                  ? order.createdAt.toDate().toLocaleDateString("en-IN", { day: '2-digit', month: 'short', year: 'numeric' }) 
+                  : "Recent";
+
+                return (
+                  <div key={order.id} className="bg-white rounded-3xl border border-amber-900/10 p-6 sm:p-8 shadow-sm space-y-6">
+                    
+                    {/* Header info */}
+                    <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-stone-100 text-xs">
+                      <div>
+                        <span className="text-stone-400 block text-[10px] uppercase tracking-wider">Order ID</span>
+                        <strong className="font-mono text-sm text-[#3E0C15]">{order.id}</strong>
+                      </div>
+                      <div>
+                        <span className="text-stone-400 block text-[10px] uppercase tracking-wider">Placed On</span>
+                        <span className="font-semibold text-stone-800">{orderDateDisplay}</span>
+                      </div>
+                      <div>
+                        <span className="text-stone-400 block text-[10px] uppercase tracking-wider">Grand Total</span>
+                        <strong className="text-sm font-bold text-stone-900">₹{(order.totalAmount || 0).toLocaleString("en-IN")}</strong>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={`px-3.5 py-1 font-bold rounded-full text-xs ${
+                          order.status === "Delivered" ? "bg-emerald-100 text-emerald-800" :
+                          order.status === "Dispatched" || order.status === "In Transit" ? "bg-sky-100 text-sky-800" :
+                          "bg-amber-100 text-[#3E0C15]"
+                        }`}>
+                          {order.status || "Processing"}
+                        </span>
+                        <Link 
+                          href={`/account/orders/${order.id}`} 
+                          onClick={() => {
+                            try {
+                              sessionStorage.setItem("suratbazar_view_order", JSON.stringify(order));
+                            } catch (e) {}
+                          }}
+                          className="px-4 py-1.5 rounded-full bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] text-xs font-bold transition-all shadow"
+                        >
+                          View Details
+                        </Link>
+                      </div>
+                    </div>
+
+                    {/* Items */}
+                    <div className="space-y-4">
+                      {order.items?.map((item, idx) => (
+                        <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                          <div className="flex items-center gap-4">
+                            <div className="relative w-20 h-24 rounded-2xl overflow-hidden bg-stone-100 border border-stone-200 shrink-0">
+                              {item.image || (item.images && item.images[0]) ? (
+                                <Image src={item.image || item.images[0]} alt={item.name} fill className="object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-[10px] text-stone-400">No Img</div>
+                              )}
+                            </div>
+                            <div>
+                              <h3 className="font-serif-luxury text-base font-semibold text-stone-900">{item.name}</h3>
+                              <p className="text-xs text-stone-500 mt-0.5">
+                                {item.blouseOption ? `${item.blouseOption} • ` : item.fabric ? `${item.fabric} • ` : ""}Qty: {item.qty || item.quantity || 1}
+                              </p>
+                              <p className="text-xs font-bold text-[#3E0C15] mt-1">₹{(item.price || 0).toLocaleString("en-IN")}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                  </div>
+                );
+              })
+            )}
           </div>
 
         </div>

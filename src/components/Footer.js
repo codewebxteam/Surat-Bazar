@@ -86,7 +86,7 @@ export default function Footer({
           
           {/* Copyright & Entity */}
           <div className="text-center md:text-left space-y-1">
-            <p>© 2026 {config.brandName} Handlooms Pvt. Ltd. All rights reserved.</p>
+            <p>© 2026 {config.brandName} Handlooms Pvt. Ltd. All rights reserved. <Link href="/admin" className="inline-block ml-2 text-stone-700 hover:text-stone-400 opacity-50 transition-colors text-[10px]">Admin</Link></p>
             <p className="text-[11px] text-stone-500 font-light">
               Crafted in reverence of the Indian Handloom Tradition. Silk Mark Registered.
             </p>

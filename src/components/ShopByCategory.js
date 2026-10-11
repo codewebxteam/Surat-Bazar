@@ -1,6 +1,11 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Sparkles } from "lucide-react";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export const CATEGORIES_DATA = [
   {
@@ -69,7 +74,33 @@ export const CATEGORIES_DATA = [
   }
 ];
 
-export default function ShopByCategory({ categories = CATEGORIES_DATA }) {
+export default function ShopByCategory() {
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchCategories() {
+      try {
+        const q = query(
+          collection(db, "categories"),
+          where("isSubcategory", "==", false)
+        );
+        const snapshot = await getDocs(q);
+        const cats = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setCategories(cats);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchCategories();
+  }, []);
+
+  if (loading || categories.length === 0) {
+    return null;
+  }
+
   return (
     <section className="py-12 sm:py-16 bg-[#FAF7F2]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12">
@@ -94,13 +125,13 @@ export default function ShopByCategory({ categories = CATEGORIES_DATA }) {
           {categories.map((cat) => (
             <Link
               key={cat.id}
-              href={cat.href}
+              href={`/collections/${cat.slug}`}
               className="group flex flex-col bg-white rounded-2xl overflow-hidden border border-amber-900/10 hover:border-[#3E0C15] hover:shadow-xl transition-all duration-300 relative"
             >
               {/* Category Image Box */}
               <div className="relative aspect-[3/4] w-full overflow-hidden bg-stone-100">
                 <Image
-                  src={cat.image}
+                  src={cat.image || "/placeholder.jpg"}
                   alt={cat.name}
                   fill
                   className="object-cover object-center group-hover:scale-110 transition-transform duration-700 ease-out"
@@ -109,13 +140,6 @@ export default function ShopByCategory({ categories = CATEGORIES_DATA }) {
 
                 {/* Subtle Gradient Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
-
-                {/* Micro Badge */}
-                {cat.badge && (
-                  <span className="absolute top-2.5 left-2.5 text-[8px] sm:text-[9px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-black/60 text-amber-300 backdrop-blur-md border border-amber-500/30">
-                    {cat.badge}
-                  </span>
-                )}
               </div>
 
               {/* Category Label & CTA */}
@@ -125,7 +149,7 @@ export default function ShopByCategory({ categories = CATEGORIES_DATA }) {
                     {cat.name}
                   </h3>
                   <p className="text-[10px] sm:text-[11px] text-stone-500 mt-0.5 line-clamp-1">
-                    {cat.subtitle}
+                    {cat.description || "Discover Collection"}
                   </p>
                 </div>
 

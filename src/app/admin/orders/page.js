@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Search, 
   Filter, 
@@ -11,79 +11,34 @@ import {
   AlertCircle, 
   Eye, 
   FileText,
-  Phone,
   MapPin,
   X
 } from "lucide-react";
+import { collection, getDocs, doc, updateDoc, orderBy, query } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function AdminOrdersPage() {
-  const [orders, setOrders] = useState([
-    {
-      id: "SB-9842",
-      customer: "Meera Singhania",
-      phone: "+91 98201 45892",
-      address: "B-402, Sea Green Apts, Worli, Mumbai - 400018",
-      items: [
-        { name: "Rani Gulabi Katan Banarasi Kadwa Saree", qty: 1, price: 38500 }
-      ],
-      totalAmount: 38500,
-      paymentMethod: "Prepaid (Razorpay UPI)",
-      status: "Processing",
-      date: "02 Oct 2026, 02:40 PM"
-    },
-    {
-      id: "SB-9841",
-      customer: "Ananya Deshmukh",
-      phone: "+91 97112 33419",
-      address: "Plot 89, Jubilee Hills, Hyderabad - 500033",
-      items: [
-        { name: "Emerald Royale Scalloped Silk Georgette", qty: 1, price: 24999 }
-      ],
-      totalAmount: 24999,
-      paymentMethod: "Prepaid (Credit Card)",
-      status: "Dispatched",
-      date: "02 Oct 2026, 11:15 AM"
-    },
-    {
-      id: "SB-9840",
-      customer: "Kavita Reddy",
-      phone: "+91 94401 88321",
-      address: "Flat 12A, Brigade Residency, Bangalore - 560001",
-      items: [
-        { name: "Heritage Crimson Kanjeevaram Silk", qty: 1, price: 42000 }
-      ],
-      totalAmount: 42000,
-      paymentMethod: "Cash on Delivery",
-      status: "Delivered",
-      date: "01 Oct 2026, 04:10 PM"
-    },
-    {
-      id: "SB-9839",
-      customer: "Rituja Patil",
-      phone: "+91 98810 54321",
-      address: "45, Prabhat Road, Lane 9, Pune - 411004",
-      items: [
-        { name: "Pastel Lavender Tissue Organza Saree", qty: 1, price: 18750 }
-      ],
-      totalAmount: 18750,
-      paymentMethod: "Prepaid (Net Banking)",
-      status: "Pending",
-      date: "01 Oct 2026, 09:20 PM"
-    },
-    {
-      id: "SB-9838",
-      customer: "Sunita Aggarwal",
-      phone: "+91 99280 12345",
-      address: "C-14, Civil Lines, Jaipur - 302006",
-      items: [
-        { name: "Royal Peacock Blue Paithani Silk", qty: 1, price: 36200 }
-      ],
-      totalAmount: 36200,
-      paymentMethod: "Prepaid (UPI)",
-      status: "Delivered",
-      date: "29 Sep 2026, 01:00 PM"
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchOrders() {
+      try {
+        const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+        const snapshot = await getDocs(q);
+        const fetchedOrders = snapshot.docs.map(doc => ({
+          id: doc.id, // This will be our SHR-xxxxx or similar
+          ...doc.data()
+        }));
+        setOrders(fetchedOrders);
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+      } finally {
+        setLoading(false);
+      }
     }
-  ]);
+    fetchOrders();
+  }, []);
 
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -97,10 +52,16 @@ export default function AdminOrdersPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const updateStatus = (orderId, newStatus) => {
-    setOrders(orders.map((o) => o.id === orderId ? { ...o, status: newStatus } : o));
-    if (selectedOrder && selectedOrder.id === orderId) {
-      setSelectedOrder({ ...selectedOrder, status: newStatus });
+  const updateStatus = async (orderId, newStatus) => {
+    try {
+      await updateDoc(doc(db, "orders", orderId), { status: newStatus });
+      setOrders(orders.map((o) => o.id === orderId ? { ...o, status: newStatus } : o));
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder({ ...selectedOrder, status: newStatus });
+      }
+    } catch (error) {
+      console.error("Error updating status:", error);
+      alert("Failed to update status.");
     }
   };
 
@@ -205,7 +166,7 @@ export default function AdminOrdersPage() {
                     </td>
 
                     <td className="py-3.5 px-4 max-w-[200px]">
-                      {order.items.map((it, idx) => (
+                      {order.items?.map((it, idx) => (
                         <div key={idx} className="truncate text-stone-700" title={it.name}>
                           {it.name} (x{it.qty})
                         </div>
@@ -286,13 +247,13 @@ export default function AdminOrdersPage() {
               <div className="pt-2 border-t border-stone-100">
                 <h4 className="font-bold text-stone-700 uppercase tracking-wider mb-2">Ordered Drapes</h4>
                 <div className="space-y-2">
-                  {selectedOrder.items.map((it, idx) => (
+                  {selectedOrder.items?.map((it, idx) => (
                     <div key={idx} className="flex justify-between items-center bg-stone-50 p-2.5 rounded-xl">
                       <div>
                         <p className="font-bold text-stone-900">{it.name}</p>
                         <p className="text-[11px] text-stone-500">Quantity: {it.qty}</p>
                       </div>
-                      <p className="font-bold text-stone-900">₹{it.price.toLocaleString("en-IN")}</p>
+                      <p className="font-bold text-stone-900">₹{(it.price || 0).toLocaleString("en-IN")}</p>
                     </div>
                   ))}
                 </div>

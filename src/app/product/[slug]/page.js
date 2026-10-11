@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useRef } from "react";
+import { use, useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -32,26 +32,50 @@ import {
   MapPin,
   X,
   Copy,
-  CheckCheck,
   Maximize2
 } from "lucide-react";
-import { PRODUCTS } from "@/data/products";
 import { useCartWishlist } from "@/context/CartWishlistContext";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ProductCard from "@/components/ProductCard";
+import { collection, query, where, getDocs, limit } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function ProductDetailPage({ params }) {
   const unwrappedParams = use(params);
   const { slug } = unwrappedParams;
 
-  const product = PRODUCTS.find((p) => p.slug === slug);
-  if (!product) {
-    return notFound();
-  }
+  const [product, setProduct] = useState(null);
+  const [relatedProducts, setRelatedProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchProductData() {
+      try {
+        const q = query(collection(db, "products"), where("slug", "==", slug), limit(1));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const docData = snap.docs[0].data();
+          setProduct({ id: snap.docs[0].id, ...docData });
+          
+          // Fetch related (random or same category, here just fetching 4 docs)
+          const relQ = query(collection(db, "products"), limit(4));
+          const relSnap = await getDocs(relQ);
+          setRelatedProducts(relSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => d.id !== snap.docs[0].id));
+        } else {
+          setProduct(null);
+        }
+      } catch (error) {
+        console.error("Error fetching product:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchProductData();
+  }, [slug]);
 
   const { addToCart, toggleWishlist, isInWishlist } = useCartWishlist();
-  const wishlisted = isInWishlist(product.id);
+  const wishlisted = product ? isInWishlist(product.id) : false;
 
   // Gallery States
   const [selectedImage, setSelectedImage] = useState(0);
@@ -65,7 +89,7 @@ export default function ProductDetailPage({ params }) {
   // Purchasing & Customization States
   const [quantity, setQuantity] = useState(1);
   const [blouseOption, setBlouseOption] = useState("unstitched");
-  const [activeColor, setActiveColor] = useState(product.colorName || "Primary");
+  const [activeColor, setActiveColor] = useState(product?.colorName || "Primary");
   const [addedToast, setAddedToast] = useState(false);
 
   // Delivery Pincode Checker
@@ -117,13 +141,19 @@ export default function ProductDetailPage({ params }) {
   const [newReviewRating, setNewReviewRating] = useState(5);
   const [showReviewForm, setShowReviewForm] = useState(false);
 
+  if (loading) {
+    return <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center">Loading product...</div>;
+  }
+
+  if (!product && !loading) {
+    return notFound();
+  }
+
   const discountPercent = product.originalPrice 
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
 
   const savingsAmount = product.originalPrice ? product.originalPrice - product.price : 0;
-
-  const relatedProducts = PRODUCTS.filter((p) => p.id !== product.id).slice(0, 4);
 
   const blousePrices = {
     unstitched: 0,

@@ -19,19 +19,98 @@ import {
   ArrowRight
 } from "lucide-react";
 import { useCartWishlist } from "@/context/CartWishlistContext";
+import { useAuth } from "@/context/AuthContext";
 import { HEADER_NAV_ITEMS } from "@/data/navigation";
 import { SITE_CONFIG } from "@/data/siteConfig";
 import AnnouncementBar from "@/components/AnnouncementBar";
 import VastraLogo from "@/components/VastraLogo";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function Navbar({ navItems = HEADER_NAV_ITEMS, config = SITE_CONFIG }) {
   const router = useRouter();
-  const { cartCount, wishlist, isLoggedIn } = useCartWishlist();
+  const { cartCount, wishlist } = useCartWishlist();
+  const { user } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedMobileCategory, setExpandedMobileCategory] = useState(null);
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [dynamicNavItems, setDynamicNavItems] = useState(navItems);
+
+  useEffect(() => {
+    async function fetchCategories() {
+      try {
+        const querySnapshot = await getDocs(collection(db, "categories"));
+        const fetchedCats = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        const mainCategories = fetchedCats.filter(c => !c.isSubcategory);
+        const subCategories = fetchedCats.filter(c => c.isSubcategory);
+
+        const primarySlugs = ["sarees", "lehenga", "suits-sets"];
+        const primaryLinks = [];
+        const otherLinks = [];
+
+        mainCategories.forEach(mainCat => {
+          const sublinks = subCategories
+            .filter(subCat => subCat.parentCategory === mainCat.slug)
+            .map(subCat => ({
+              name: subCat.name,
+              href: `/collections/${subCat.slug}`,
+              image: subCat.image
+            }));
+            
+          const linkObj = {
+            id: mainCat.slug,
+            name: mainCat.name.toUpperCase(),
+            href: `/collections/${mainCat.slug}`,
+            sublinks: sublinks.length > 0 ? sublinks : undefined,
+          };
+
+          if (primarySlugs.includes(mainCat.slug)) {
+            primaryLinks.push(linkObj);
+          } else {
+            // Push to others as a simple sublink for the Collections dropdown
+            otherLinks.push({
+              name: mainCat.name,
+              href: `/collections/${mainCat.slug}`
+            });
+          }
+        });
+
+        const collectionsDropdown = {
+          id: "collections",
+          name: "COLLECTIONS",
+          href: "/collections",
+          sublinks: otherLinks.length > 0 ? otherLinks : undefined
+        };
+
+        // Combine static "SALE" with primary links, the collections dropdown, and append "NEW ARRIVALS" & "BESTSELLERS"
+        const combinedNav = [
+          navItems.find(item => item.id === "sale"),
+          ...primaryLinks,
+          otherLinks.length > 0 ? collectionsDropdown : null,
+          navItems.find(item => item.id === "new-arrivals"),
+          navItems.find(item => item.id === "bestsellers")
+        ].filter(Boolean);
+
+        // Remove duplicates by name to prevent duplicate key errors
+        const uniqueNav = [];
+        const seenNames = new Set();
+        for (const item of combinedNav) {
+          if (!seenNames.has(item.name.toLowerCase())) {
+            seenNames.add(item.name.toLowerCase());
+            uniqueNav.push(item);
+          }
+        }
+        
+        setDynamicNavItems(uniqueNav);
+      } catch (error) {
+        console.error("Error fetching navbar categories:", error);
+      }
+    }
+    fetchCategories();
+  }, [navItems]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -67,8 +146,8 @@ export default function Navbar({ navItems = HEADER_NAV_ITEMS, config = SITE_CONF
     setExpandedMobileCategory((prev) => (prev === name ? null : name));
   };
 
-  const accountUrl = isLoggedIn ? "/account" : "/account/login";
-  const desktopNavItems = navItems;
+  const accountUrl = user ? "/account" : "/login";
+  const desktopNavItems = dynamicNavItems;
 
   return (
     <header className="w-full sticky top-0 z-50 transition-all duration-300">
@@ -162,7 +241,7 @@ export default function Navbar({ navItems = HEADER_NAV_ITEMS, config = SITE_CONF
               >
                 <User className="w-5 h-5 group-hover:scale-110 transition-transform" />
                 <span className="text-xs font-semibold uppercase tracking-wider hidden xl:inline">
-                  {isLoggedIn ? "Account" : "Sign In"}
+                  {user ? "Account" : "Sign In"}
                 </span>
               </Link>
 
@@ -202,16 +281,19 @@ export default function Navbar({ navItems = HEADER_NAV_ITEMS, config = SITE_CONF
 
                 {/* Dropdown Menu */}
                 {item.sublinks && activeDropdown === item.name && (
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 w-64 bg-white rounded-2xl shadow-2xl border border-amber-900/10 py-3 px-2 z-50 animate-in fade-in slide-in-from-top-1">
-                    {item.sublinks.map((sub) => (
-                      <Link
-                        key={sub.name}
-                        href={sub.href}
-                        className="block px-3.5 py-2 text-xs text-stone-700 hover:text-[#3E0C15] hover:bg-[#FAF7F2] rounded-xl transition-colors font-medium"
-                      >
-                        {sub.name}
-                      </Link>
-                    ))}
+                  <div className={`absolute top-full left-1/2 -translate-x-1/2 ${item.sublinks.length > 6 ? 'w-[420px]' : 'w-56'} bg-white rounded-2xl shadow-2xl border border-amber-900/10 py-3 px-3 z-50 animate-in fade-in slide-in-from-top-1`}>
+                    <div className={item.sublinks.length > 6 ? 'grid grid-cols-2 gap-x-3 gap-y-1' : 'flex flex-col gap-1'}>
+                      {item.sublinks.map((sub) => (
+                        <Link
+                          key={sub.name}
+                          href={sub.href}
+                          className="flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-stone-600 hover:text-[#3E0C15] hover:bg-[#FAF7F2] rounded-lg transition-all group/sub"
+                        >
+                          <ChevronRight className="w-3 h-3 text-stone-300 opacity-0 group-hover/sub:opacity-100 group-hover/sub:text-[#3E0C15] transition-all -ml-2" />
+                          <span className="flex-1 transition-transform group-hover/sub:translate-x-1 line-clamp-1">{sub.name}</span>
+                        </Link>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -391,9 +473,14 @@ export default function Navbar({ navItems = HEADER_NAV_ITEMS, config = SITE_CONF
                               key={sub.name}
                               href={sub.href}
                               onClick={() => setMobileMenuOpen(false)}
-                              className="block text-xs text-stone-600 hover:text-[#571520] py-1 font-medium"
+                              className="flex items-center gap-3 text-xs text-stone-600 hover:text-[#571520] py-1.5 font-medium"
                             >
-                              {sub.name}
+                              {sub.image && (
+                                <div className="w-8 h-8 rounded border border-stone-200 shrink-0 overflow-hidden">
+                                  <img src={sub.image} alt={sub.name} className="w-full h-full object-cover" />
+                                </div>
+                              )}
+                              <span>{sub.name}</span>
                             </Link>
                           ))}
                         </div>
@@ -413,7 +500,7 @@ export default function Navbar({ navItems = HEADER_NAV_ITEMS, config = SITE_CONF
                   onClick={() => setMobileMenuOpen(false)} 
                   className="flex items-center justify-between py-1 font-bold text-stone-900 hover:text-[#3E0C15]"
                 >
-                  <span>{isLoggedIn ? "My Royal Account" : "Sign In / Register"}</span>
+                  <span>{user ? "My Royal Account" : "Sign In / Register"}</span>
                   <ChevronRight className="w-3.5 h-3.5 text-stone-400" />
                 </Link>
                 <Link 

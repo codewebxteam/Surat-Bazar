@@ -120,7 +120,7 @@ export const FOOTER_COLUMNS = [
     links: [
       { label: "Contact Us", href: "/pages/contact-us" },
       { label: "Shipping & Delivery", href: "/pages/shipping-policy" },
-      { label: "Track Order", href: "/account/orders" },
+      { label: "Track Order", href: "/track" },
       { label: "Returns & Exchange", href: "/pages/return-policy" },
       { label: "FAQs", href: "/pages/faq" },
     ],

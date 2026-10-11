@@ -70,7 +70,7 @@ export default function OrderSuccessPage({ params }) {
           {/* Action CTAs: Track Order & Continue Shopping */}
           <div className="flex flex-col sm:flex-row gap-3.5 justify-center">
             <Link
-              href={`/account/orders/${displayOrderId}`}
+              href={`/track?id=${displayOrderId}`}
               id="order-success-track-order"
               className="px-8 py-3.5 rounded-full bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] text-xs uppercase tracking-widest font-bold transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
             >

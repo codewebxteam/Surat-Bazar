@@ -3,10 +3,11 @@
 import { useState, useMemo, Suspense, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Search, Sparkles, X, ChevronDown } from "lucide-react";
-import { PRODUCTS } from "@/data/products";
 import ProductCard from "@/components/ProductCard";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 function SearchContent() {
   const router = useRouter();
@@ -14,6 +15,24 @@ function SearchContent() {
   const initialQuery = searchParams.get("q") || "";
   const [query, setQuery] = useState(initialQuery);
   const [sortBy, setSortBy] = useState("featured");
+  
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchProducts() {
+      try {
+        const querySnapshot = await getDocs(collection(db, "products"));
+        const fetchedProducts = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setProducts(fetchedProducts);
+      } catch (error) {
+        console.error("Error fetching products:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchProducts();
+  }, []);
 
   useEffect(() => {
     setQuery(searchParams.get("q") || "");
@@ -29,21 +48,21 @@ function SearchContent() {
   };
 
   const results = useMemo(() => {
-    let list = PRODUCTS;
+    let list = products;
     if (query.trim()) {
       const lower = query.toLowerCase();
-      list = PRODUCTS.filter((item) => {
+      list = products.filter((item) => {
         return (
-          item.name.toLowerCase().includes(lower) ||
-          item.category.toLowerCase().includes(lower) ||
-          item.categoryName.toLowerCase().includes(lower) ||
-          item.fabric.toLowerCase().includes(lower) ||
-          item.fabricName.toLowerCase().includes(lower) ||
-          item.color.toLowerCase().includes(lower) ||
-          item.colorName.toLowerCase().includes(lower) ||
-          item.occasion.toLowerCase().includes(lower) ||
-          item.occasionName.toLowerCase().includes(lower) ||
-          item.description.toLowerCase().includes(lower)
+          item.name?.toLowerCase().includes(lower) ||
+          item.category?.toLowerCase().includes(lower) ||
+          item.categoryName?.toLowerCase().includes(lower) ||
+          item.fabric?.toLowerCase().includes(lower) ||
+          item.fabricName?.toLowerCase().includes(lower) ||
+          item.color?.toLowerCase().includes(lower) ||
+          item.colorName?.toLowerCase().includes(lower) ||
+          item.occasion?.toLowerCase().includes(lower) ||
+          item.occasionName?.toLowerCase().includes(lower) ||
+          item.description?.toLowerCase().includes(lower)
         );
       });
     }
@@ -52,11 +71,11 @@ function SearchContent() {
       if (sortBy === "price-low-high") return a.price - b.price;
       if (sortBy === "price-high-low") return b.price - a.price;
       if (sortBy === "newest") return (b.isNewArrival ? 1 : 0) - (a.isNewArrival ? 1 : 0);
-      if (sortBy === "best-selling") return (b.isBestseller ? 1 : 0) - (a.isBestseller ? 1 : 0) || b.reviewsCount - a.reviewsCount;
-      if (sortBy === "rating") return b.rating - a.rating || b.reviewsCount - a.reviewsCount;
+      if (sortBy === "best-selling") return (b.isBestseller ? 1 : 0) - (a.isBestseller ? 1 : 0) || (b.reviewsCount || 0) - (a.reviewsCount || 0);
+      if (sortBy === "rating") return (b.rating || 0) - (a.rating || 0) || (b.reviewsCount || 0) - (a.reviewsCount || 0);
       return 0; // default "featured"
     });
-  }, [query, sortBy]);
+  }, [query, sortBy, products]);
 
   // Popular search keywords explicitly requested: Silk Saree, Wedding Saree, Banarasi, Organza
   const popularKeywords = [

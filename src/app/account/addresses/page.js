@@ -1,37 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, MapPin, Plus, Trash2, Edit2, CheckCircle2, ShieldCheck } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { useAuth } from "@/context/AuthContext";
+import { db } from "@/lib/firebase";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { useRouter } from "next/navigation";
 
 export default function AddressesPage() {
-  const [addresses, setAddresses] = useState([
-    {
-      id: 1,
-      type: "Home (Primary Delivery)",
-      name: "Sanskriti Sharma",
-      mobile: "+91 98765 43210",
-      address: "B-402, Heritage Imperial Towers, Sector 54, Golf Course Road",
-      city: "Gurgaon",
-      state: "Haryana",
-      pincode: "122002",
-      isDefault: true,
-    },
-    {
-      id: 2,
-      type: "Family Estate / Bridal Venue",
-      name: "Sanskriti Sharma (C/O Singhania Estate)",
-      mobile: "+91 98111 22334",
-      address: "Villa 14, Royal Palm Boulevard, Mehrauli",
-      city: "New Delhi",
-      state: "Delhi",
-      pincode: "110030",
-      isDefault: false,
-    }
-  ]);
-
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const [addresses, setAddresses] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -43,10 +26,42 @@ export default function AddressesPage() {
     type: "Home",
   });
 
-  const handleAddAddress = (e) => {
+  useEffect(() => {
+    if (user) {
+      fetchAddresses();
+    }
+  }, [user, authLoading, router]);
+
+  const fetchAddresses = async () => {
+    try {
+      const docRef = doc(db, "users", user.uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const userData = docSnap.data();
+        setAddresses(userData.addresses || []);
+      }
+    } catch (error) {
+      console.error("Error fetching addresses:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const syncAddressesToFirestore = async (newAddresses) => {
+    try {
+      const docRef = doc(db, "users", user.uid);
+      await updateDoc(docRef, { addresses: newAddresses });
+      setAddresses(newAddresses);
+    } catch (error) {
+      console.error("Error updating addresses:", error);
+      alert("Failed to save address. Please try again.");
+    }
+  };
+
+  const handleAddAddress = async (e) => {
     e.preventDefault();
     const newAddr = {
-      id: Date.now(),
+      id: Date.now().toString(),
       type: formData.type || "Home",
       name: formData.name,
       mobile: formData.mobile,
@@ -56,18 +71,73 @@ export default function AddressesPage() {
       pincode: formData.pincode,
       isDefault: addresses.length === 0,
     };
-    setAddresses([...addresses, newAddr]);
+    
+    const updatedAddresses = [...addresses, newAddr];
+    await syncAddressesToFirestore(updatedAddresses);
+    
     setShowAddForm(false);
     setFormData({ name: "", mobile: "", address: "", city: "", state: "", pincode: "", type: "Home" });
   };
 
-  const handleDelete = (id) => {
-    setAddresses(addresses.filter((a) => a.id !== id));
+  const handleDelete = async (id) => {
+    const updatedAddresses = addresses.filter((a) => a.id !== id);
+    // If the deleted one was default and there are others left, make the first one default
+    if (addresses.find(a => a.id === id)?.isDefault && updatedAddresses.length > 0) {
+      updatedAddresses[0].isDefault = true;
+    }
+    await syncAddressesToFirestore(updatedAddresses);
   };
 
-  const handleSetDefault = (id) => {
-    setAddresses(addresses.map((a) => ({ ...a, isDefault: a.id === id })));
+  const handleSetDefault = async (id) => {
+    const updatedAddresses = addresses.map((a) => ({ ...a, isDefault: a.id === id }));
+    await syncAddressesToFirestore(updatedAddresses);
   };
+
+  if (authLoading || loading) {
+    return (
+      <>
+        <Navbar />
+        <div className="min-h-screen flex items-center justify-center bg-[#FAF7F2]">
+          <p className="text-stone-500 font-medium">Loading addresses...</p>
+        </div>
+        <Footer />
+      </>
+    );
+  }
+
+  if (!user) {
+    return (
+      <>
+        <Navbar />
+        <main className="min-h-screen bg-[#FAF7F2] flex items-center justify-center p-4">
+          <div className="bg-white max-w-md w-full rounded-3xl p-8 sm:p-12 text-center shadow-xl border border-amber-900/10">
+            <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <MapPin className="w-10 h-10 text-amber-800" />
+            </div>
+            <h2 className="font-serif-luxury text-3xl font-bold text-[#3E0C15] mb-3">Login Required</h2>
+            <p className="text-stone-500 mb-8 text-sm">
+              Please log in to your account to view and manage your saved delivery addresses.
+            </p>
+            <div className="space-y-4">
+              <Link 
+                href="/login" 
+                className="flex items-center justify-center w-full bg-[#3E0C15] text-[#F7EFCF] py-3.5 rounded-xl font-bold hover:bg-[#571520] transition-colors"
+              >
+                Log In to Your Account
+              </Link>
+              <Link 
+                href="/register" 
+                className="flex items-center justify-center w-full bg-white text-[#3E0C15] border-2 border-[#3E0C15] py-3.5 rounded-xl font-bold hover:bg-amber-50 transition-colors"
+              >
+                Create New Account
+              </Link>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
   return (
     <>
@@ -218,50 +288,64 @@ export default function AddressesPage() {
 
           {/* Addresses Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {addresses.map((addr) => (
-              <div key={addr.id} className="bg-white rounded-3xl border border-amber-900/10 p-6 shadow-sm flex flex-col justify-between space-y-4">
-                <div>
-                  <div className="flex items-center justify-between pb-3 border-b border-stone-100">
-                    <span className="font-bold text-xs uppercase tracking-wider text-[#3E0C15]">{addr.type}</span>
-                    {addr.isDefault && (
-                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
-                        Default Address
+            {addresses.length === 0 ? (
+              <div className="sm:col-span-2 p-12 text-center bg-white rounded-3xl border border-stone-200">
+                <MapPin className="w-10 h-10 text-stone-300 mx-auto mb-3" />
+                <h3 className="font-serif-luxury text-xl font-bold text-stone-800 mb-1">No Saved Addresses</h3>
+                <p className="text-xs text-stone-500">You haven't saved any delivery addresses yet.</p>
+                <button 
+                  onClick={() => setShowAddForm(true)}
+                  className="mt-4 px-6 py-2.5 bg-[#3E0C15] text-[#F7EFCF] text-xs font-bold rounded-full"
+                >
+                  Add Your First Address
+                </button>
+              </div>
+            ) : (
+              addresses.map((addr) => (
+                <div key={addr.id} className="bg-white rounded-3xl border border-amber-900/10 p-6 shadow-sm flex flex-col justify-between space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+                      <span className="font-bold text-xs uppercase tracking-wider text-[#3E0C15]">{addr.type}</span>
+                      {addr.isDefault && (
+                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+                          Default Address
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-3 space-y-1 text-xs text-stone-700 leading-relaxed">
+                      <strong className="font-semibold text-sm text-stone-900 block">{addr.name}</strong>
+                      <p>{addr.address}</p>
+                      <p>{addr.city}, {addr.state} - {addr.pincode}</p>
+                      <p className="text-stone-500 pt-1">Mobile: {addr.mobile}</p>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-stone-100 flex items-center justify-between text-xs">
+                    {!addr.isDefault ? (
+                      <button
+                        onClick={() => handleSetDefault(addr.id)}
+                        className="text-amber-800 font-semibold hover:underline cursor-pointer"
+                      >
+                        Set as Default
+                      </button>
+                    ) : (
+                      <span className="text-emerald-700 font-medium flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Primary
                       </span>
                     )}
-                  </div>
 
-                  <div className="mt-3 space-y-1 text-xs text-stone-700 leading-relaxed">
-                    <strong className="font-semibold text-sm text-stone-900 block">{addr.name}</strong>
-                    <p>{addr.address}</p>
-                    <p>{addr.city}, {addr.state} - {addr.pincode}</p>
-                    <p className="text-stone-500 pt-1">Mobile: {addr.mobile}</p>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-stone-100 flex items-center justify-between text-xs">
-                  {!addr.isDefault ? (
                     <button
-                      onClick={() => handleSetDefault(addr.id)}
-                      className="text-amber-800 font-semibold hover:underline cursor-pointer"
+                      onClick={() => handleDelete(addr.id)}
+                      className="text-stone-400 hover:text-rose-600 transition-colors p-1 cursor-pointer"
+                      title="Delete Address"
                     >
-                      Set as Default
+                      <Trash2 className="w-4 h-4" />
                     </button>
-                  ) : (
-                    <span className="text-emerald-700 font-medium flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Primary
-                    </span>
-                  )}
-
-                  <button
-                    onClick={() => handleDelete(addr.id)}
-                    className="text-stone-400 hover:text-rose-600 transition-colors p-1 cursor-pointer"
-                    title="Delete Address"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
         </div>

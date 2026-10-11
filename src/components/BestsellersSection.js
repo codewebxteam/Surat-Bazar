@@ -1,11 +1,40 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Sparkles, ArrowRight } from "lucide-react";
 import ProductCard from "@/components/ProductCard";
-import { PRODUCTS } from "@/data/products";
+import { collection, query, where, limit, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function BestsellersSection() {
-  // Filter distinct bestsellers sarees
-  const allBestsellers = PRODUCTS.filter((p) => p.isBestseller).slice(0, 8);
+  const [bestsellers, setBestsellers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchBestsellers() {
+      try {
+        const q = query(
+          collection(db, "products"),
+          where("isBestseller", "==", true),
+          limit(8)
+        );
+        const snapshot = await getDocs(q);
+        const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setBestsellers(products);
+      } catch (error) {
+        console.error("Error fetching bestsellers:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    fetchBestsellers();
+  }, []);
+
+  if (loading || bestsellers.length === 0) {
+    return null;
+  }
 
   return (
     <section className="py-14 sm:py-20 bg-[#FAF7F2] border-t border-amber-900/10">
@@ -25,7 +54,6 @@ export default function BestsellersSection() {
             </h2>
           </div>
 
-          {/* View All Button -> /bestsellers */}
           <Link
             href="/bestsellers"
             className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#3E0C15] hover:text-[#571520] transition-colors group"
@@ -35,13 +63,8 @@ export default function BestsellersSection() {
           </Link>
         </div>
 
-        {/* 
-          Responsive Grid:
-          - Desktop (lg): 4 products/row (8 products total across 2 rows)
-          - Mobile: 2 products/row (6 initial products shown on mobile)
-        */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 sm:gap-5 md:gap-6">
-          {allBestsellers.map((product, index) => (
+          {bestsellers.map((product, index) => (
             <div 
               key={product.id}
               className={index >= 6 ? "hidden lg:block" : "block"}
@@ -51,13 +74,12 @@ export default function BestsellersSection() {
           ))}
         </div>
 
-        {/* Mobile View All Bottom CTA */}
         <div className="mt-8 text-center sm:hidden">
           <Link
             href="/bestsellers"
             className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-[#3E0C15] text-[#F7EFCF] text-xs font-bold uppercase tracking-wider w-full shadow-md"
           >
-            <span>View All Bestsellers ({PRODUCTS.filter((p) => p.isBestseller).length})</span>
+            <span>View All Bestsellers</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>

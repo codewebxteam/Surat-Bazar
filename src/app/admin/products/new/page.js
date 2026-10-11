@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { 
   ArrowLeft, 
   Sparkles, 
@@ -11,14 +11,80 @@ import {
   Tag, 
   ShieldCheck, 
   Image as ImageIcon,
-  Plus,
-  Trash2
+  Trash2,
+  X
 } from "lucide-react";
+import { IKContext, IKUpload } from "imagekitio-react";
+import { collection, addDoc, getDocs, getDoc, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
-export default function AddNewProductPage() {
+const authenticator = async () => {
+  try {
+    const response = await fetch("/api/imagekit/auth");
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Request failed with status ${response.status}: ${errorText}`);
+    }
+    const data = await response.json();
+    const { signature, expire, token } = data;
+    return { signature, expire, token };
+  } catch (error) {
+    throw new Error(`Authentication request failed: ${error.message}`);
+  }
+};
+
+function AddProductForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("id");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState(false);
+  const [dynamicCategories, setDynamicCategories] = useState([]);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        // Fetch Categories
+        const querySnapshot = await getDocs(collection(db, "categories"));
+        const cats = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setDynamicCategories(cats);
+
+        // If editing, fetch Product
+        if (editId) {
+          const docRef = doc(db, "products", editId);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setFormData({
+              name: data.name || "",
+              slug: data.slug || "",
+              tagline: data.tagline || "",
+              category: data.category || "",
+              categoryName: data.categoryName || "",
+              subcategory: data.subcategory || "",
+              subcategoryName: data.subcategoryName || "",
+              fabricName: data.fabricName || "",
+              occasions: data.occasions || [],
+              collections: data.collections || [],
+              price: data.price ? data.price.toString() : "",
+              stock: data.stock !== undefined ? data.stock.toString() : "",
+              colorName: data.colorName || "",
+              images: data.images || [],
+              zari: data.zari || "",
+              length: data.length || "",
+              description: data.description || "",
+              isBestseller: !!data.isBestseller,
+              isNewArrival: !!data.isNewArrival,
+              isSale: !!data.isSale
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    }
+    fetchData();
+  }, [editId]);
 
   // Form State initialized completely empty
   const [formData, setFormData] = useState({
@@ -27,23 +93,17 @@ export default function AddNewProductPage() {
     tagline: "",
     category: "",
     categoryName: "",
-    fabric: "",
+    subcategory: "",
+    subcategoryName: "",
     fabricName: "",
-    occasion: "",
-    occasionName: "",
+    occasions: [],
+    collections: [],
     price: "",
-    originalPrice: "",
     stock: "",
     colorName: "",
-    colorHex: "#9B111E",
-    imageUrl: "",
-    weave: "",
+    images: [],
     zari: "",
-    blousePiece: "",
     length: "",
-    weight: "",
-    care: "",
-    certification: "",
     description: "",
     isBestseller: false,
     isNewArrival: false,
@@ -60,18 +120,51 @@ export default function AddNewProductPage() {
     setFormData((prev) => ({ ...prev, name, slug }));
   };
 
-  const handleSubmit = (e) => {
+  const toggleSelection = (field, slug) => {
+    setFormData(prev => {
+      const currentList = prev[field] || [];
+      if (currentList.includes(slug)) {
+        return { ...prev, [field]: currentList.filter(item => item !== slug) };
+      } else {
+        return { ...prev, [field]: [...currentList, slug] };
+      }
+    });
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     
-    // Simulate save or write to Firestore
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      if (editId) {
+        // Update existing product
+        const docRef = doc(db, "products", editId);
+        await updateDoc(docRef, {
+          ...formData,
+          price: Number(formData.price),
+          stock: Number(formData.stock),
+          updatedAt: serverTimestamp()
+        });
+      } else {
+        // Add new product
+        await addDoc(collection(db, "products"), {
+          ...formData,
+          price: Number(formData.price),
+          stock: Number(formData.stock),
+          createdAt: serverTimestamp()
+        });
+      }
+      
       setSuccessMessage(true);
       setTimeout(() => {
         router.push("/admin/products");
       }, 1500);
-    }, 800);
+    } catch (error) {
+      console.error("Error adding document: ", error);
+      alert("Failed to add product. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -161,7 +254,7 @@ export default function AddNewProductPage() {
               <span className="w-2 h-2 rounded-full bg-[#C5832B]"></span> Pricing & Stock
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
                   Selling Price (₹) *
@@ -173,19 +266,6 @@ export default function AddNewProductPage() {
                   value={formData.price}
                   onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                   className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#C5832B]/50 placeholder:text-stone-400"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
-                  Original / MRP Price (₹)
-                </label>
-                <input
-                  type="number"
-                  placeholder="e.g. 32000"
-                  value={formData.originalPrice}
-                  onChange={(e) => setFormData({ ...formData, originalPrice: e.target.value })}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C5832B]/50 placeholder:text-stone-400"
                 />
               </div>
 
@@ -205,13 +285,49 @@ export default function AddNewProductPage() {
             </div>
           </div>
 
-          {/* Section 3: Fabric, Occasion & Color */}
+          {/* Section 3: Fabric, Occasion & Category */}
           <div className="pt-4 border-t border-stone-100 space-y-4">
             <h3 className="font-serif font-bold text-base text-stone-900 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#C5832B]"></span> Fabric, Occasion & Color
+              <span className="w-2 h-2 rounded-full bg-[#C5832B]"></span> Classifications (Category, Fabric, Occasion, Collection)
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
+                  Main Category *
+                </label>
+                <select
+                  required
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value, categoryName: e.target.options[e.target.selectedIndex].text })}
+                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#C5832B]/50 text-stone-800"
+                >
+                  <option value="" disabled>-- Select Category --</option>
+                  {dynamicCategories.filter(cat => !cat.type || cat.type === "main").map(cat => (
+                    <option key={cat.id} value={cat.slug}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Subcategory Select (Appears dynamically) */}
+              {dynamicCategories.some(cat => cat.isSubcategory && cat.parentCategory === formData.category) && (
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
+                    Subcategory (Optional)
+                  </label>
+                  <select
+                    value={formData.subcategory}
+                    onChange={(e) => setFormData({ ...formData, subcategory: e.target.value, subcategoryName: e.target.options[e.target.selectedIndex].text })}
+                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#C5832B]/50 text-stone-800"
+                  >
+                    <option value="">-- Select Subcategory --</option>
+                    {dynamicCategories.filter(cat => (cat.type === "sub" || cat.isSubcategory === true) && cat.parentCategory === formData.category).map(cat => (
+                      <option key={cat.id} value={cat.slug}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
                   Fabric Type *
@@ -223,32 +339,9 @@ export default function AddNewProductPage() {
                   className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#C5832B]/50 text-stone-800"
                 >
                   <option value="" disabled>-- Select Fabric --</option>
-                  <option value="katan-silk">Pure Katan Silk</option>
-                  <option value="georgette">Pure Silk Georgette</option>
-                  <option value="organza">Pure Tissue Organza</option>
-                  <option value="kanjeevaram">Pure Kanjeevaram Silk</option>
-                  <option value="paithani">Pure Paithani Silk</option>
-                  <option value="chiffon">Pure Khaddi Chiffon</option>
-                  <option value="tussar">Tussar Silk</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
-                  Occasion Category *
-                </label>
-                <select
-                  required
-                  value={formData.occasion}
-                  onChange={(e) => setFormData({ ...formData, occasion: e.target.value, occasionName: e.target.options[e.target.selectedIndex].text })}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#C5832B]/50 text-stone-800"
-                >
-                  <option value="" disabled>-- Select Occasion --</option>
-                  <option value="wedding">Wedding & Bridal</option>
-                  <option value="festive">Festive & Celebrations</option>
-                  <option value="reception">Grand Reception</option>
-                  <option value="cocktail">Cocktail & Evening Soiree</option>
-                  <option value="puja">Traditional Puja & Rituals</option>
+                  {dynamicCategories.filter(cat => cat.type === "fabric").map(cat => (
+                    <option key={cat.id} value={cat.slug}>{cat.name}</option>
+                  ))}
                 </select>
               </div>
 
@@ -265,6 +358,53 @@ export default function AddNewProductPage() {
                 />
               </div>
             </div>
+
+            {/* Multi-Select Pills */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6 pt-4 border-t border-stone-100">
+              <div>
+                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-3">
+                  Occasions (Select Multiple)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {dynamicCategories.filter(cat => cat.type === "occasion").map(cat => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => toggleSelection('occasions', cat.slug)}
+                      className={`px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all border ${
+                        formData.occasions.includes(cat.slug) 
+                          ? 'bg-[#3E0C15] text-white border-[#3E0C15] shadow-sm' 
+                          : 'bg-stone-50 text-stone-600 border-stone-200 hover:border-amber-500 hover:text-amber-700'
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-3">
+                  Collections (Select Multiple)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {dynamicCategories.filter(cat => cat.type === "collection").map(cat => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => toggleSelection('collections', cat.slug)}
+                      className={`px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all border ${
+                        formData.collections.includes(cat.slug) 
+                          ? 'bg-[#C5832B] text-white border-[#C5832B] shadow-sm' 
+                          : 'bg-stone-50 text-stone-600 border-stone-200 hover:border-amber-500 hover:text-amber-700'
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Section 4: Saree Image */}
@@ -274,21 +414,64 @@ export default function AddNewProductPage() {
             </h3>
 
             <div>
-              <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
-                Main Image Path / URL
+              <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-3">
+                Upload Images
               </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="e.g. /products/georgette.jpg or https://image-url..."
-                  value={formData.imageUrl}
-                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#C5832B]/50 placeholder:text-stone-400"
-                />
-              </div>
-              <p className="text-[11px] text-stone-400 mt-1">
-                You can provide a local path like <code className="bg-stone-100 px-1 py-0.5 rounded">/products/banarasi.jpg</code> or an external image link.
-              </p>
+              
+              <IKContext 
+                publicKey={process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY} 
+                urlEndpoint={process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT} 
+                authenticator={authenticator}
+              >
+                <div className="flex items-center justify-center w-full">
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-stone-300 border-dashed rounded-xl cursor-pointer bg-stone-50 hover:bg-stone-100">
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <ImageIcon className="w-8 h-8 text-stone-400 mb-2" />
+                      <p className="text-sm text-stone-500"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                    </div>
+                    <IKUpload
+                      className="hidden"
+                      fileName="saree-image"
+                      tags={["saree"]}
+                      useUniqueFileName={true}
+                      isPrivateFile={false}
+                      onSuccess={(res) => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          images: [...prev.images, res.url]
+                        }));
+                      }}
+                      onError={(err) => {
+                        console.error("Image upload failed", err);
+                        alert("Image upload failed. Check console for details.");
+                      }}
+                    />
+                  </label>
+                </div>
+              </IKContext>
+
+              {/* Uploaded Images Preview */}
+              {formData.images.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
+                  {formData.images.map((img, idx) => (
+                    <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-stone-200 group">
+                      <img src={img} alt={`Uploaded ${idx}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => ({
+                            ...prev,
+                            images: prev.images.filter((_, i) => i !== idx)
+                          }));
+                        }}
+                        className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-rose-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -299,19 +482,6 @@ export default function AddNewProductPage() {
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
-                  Weave / Karigari Technique
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Authentic Kadwa Handloom / Scallop Resham"
-                  value={formData.weave}
-                  onChange={(e) => setFormData({ ...formData, weave: e.target.value })}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#C5832B]/50 placeholder:text-stone-400"
-                />
-              </div>
-
               <div>
                 <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
                   Zari Quality
@@ -327,32 +497,6 @@ export default function AddNewProductPage() {
 
               <div>
                 <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
-                  Blouse Piece Details
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Unstitched 0.8m Brocade Blouse Piece with sleeve border"
-                  value={formData.blousePiece}
-                  onChange={(e) => setFormData({ ...formData, blousePiece: e.target.value })}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#C5832B]/50 placeholder:text-stone-400"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
-                  Certification
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Silk Mark Certified 100% Pure Silk"
-                  value={formData.certification}
-                  onChange={(e) => setFormData({ ...formData, certification: e.target.value })}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#C5832B]/50 placeholder:text-stone-400"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
                   Length & Measurements
                 </label>
                 <input
@@ -360,19 +504,6 @@ export default function AddNewProductPage() {
                   placeholder="e.g. 5.5 meters saree + 0.8 meter blouse piece"
                   value={formData.length}
                   onChange={(e) => setFormData({ ...formData, length: e.target.value })}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#C5832B]/50 placeholder:text-stone-400"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
-                  Weight
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 650 - 750 grams"
-                  value={formData.weight}
-                  onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
                   className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#C5832B]/50 placeholder:text-stone-400"
                 />
               </div>
@@ -439,11 +570,19 @@ export default function AddNewProductPage() {
               className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#571520] to-[#3A0D15] text-[#F3E5C8] hover:text-white font-semibold text-xs sm:text-sm shadow-md hover:shadow-lg transition-all flex items-center gap-2 border border-[#9B111E]/40 disabled:opacity-60 cursor-pointer"
             >
               <Save className="w-4 h-4" />
-              <span>{isSubmitting ? "Publishing Saree..." : "Publish Saree to Catalog"}</span>
+              <span>{isSubmitting ? (editId ? "Updating Saree..." : "Publishing Saree...") : (editId ? "Update Saree" : "Publish Saree to Catalog")}</span>
             </button>
           </div>
         </form>
       </div>
     </div>
+  );
+}
+
+export default function AddNewProductPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-stone-500">Loading form...</div>}>
+      <AddProductForm />
+    </Suspense>
   );
 }

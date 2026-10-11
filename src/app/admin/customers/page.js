@@ -1,68 +1,114 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Users, Search, Mail, Phone, MapPin, ShoppingBag, Star } from "lucide-react";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function AdminCustomersPage() {
   const [search, setSearch] = useState("");
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const customers = [
-    {
-      id: "CUST-101",
-      name: "Meera Singhania",
-      email: "meera.singhania@gmail.com",
-      phone: "+91 98201 45892",
-      city: "Mumbai, Maharashtra",
-      totalOrders: 6,
-      totalSpent: 184500,
-      tier: "VIP Bride Club",
-      joined: "Jan 2026"
-    },
-    {
-      id: "CUST-102",
-      name: "Ananya Deshmukh",
-      email: "ananya.deshmukh@yahoo.com",
-      phone: "+91 97112 33419",
-      city: "Hyderabad, Telangana",
-      totalOrders: 3,
-      totalSpent: 74999,
-      tier: "Silk Connoisseur",
-      joined: "Mar 2026"
-    },
-    {
-      id: "CUST-103",
-      name: "Kavita Reddy",
-      email: "kavita.reddy@outlook.com",
-      phone: "+91 94401 88321",
-      city: "Bangalore, Karnataka",
-      totalOrders: 4,
-      totalSpent: 98000,
-      tier: "Silk Connoisseur",
-      joined: "Feb 2026"
-    },
-    {
-      id: "CUST-104",
-      name: "Rituja Patil",
-      email: "patil.rituja@gmail.com",
-      phone: "+91 98810 54321",
-      city: "Pune, Maharashtra",
-      totalOrders: 1,
-      totalSpent: 18750,
-      tier: "Patron",
-      joined: "Sep 2026"
-    },
-    {
-      id: "CUST-105",
-      name: "Sunita Aggarwal",
-      email: "sunita.aggarwal@hotmail.com",
-      phone: "+91 99280 12345",
-      city: "Jaipur, Rajasthan",
-      totalOrders: 5,
-      totalSpent: 142000,
-      tier: "VIP Bride Club",
-      joined: "Nov 2025"
+  useEffect(() => {
+    async function fetchCustomers() {
+      try {
+        const custMap = new Map();
+
+        // 1. Fetch Registered Users
+        const usersSnapshot = await getDocs(collection(db, "users"));
+        usersSnapshot.docs.forEach(doc => {
+          const data = doc.data();
+          if (data.role === "admin") return; // Skip admins
+
+          const identifier = data.email || data.phone || doc.id;
+          custMap.set(identifier, {
+            id: doc.id,
+            name: data.name || "Unknown",
+            email: data.email || "N/A",
+            phone: data.phone || "N/A",
+            city: "N/A", // We don't have city on registration right now
+            totalOrders: 0,
+            totalSpent: 0,
+            joined: data.createdAt ? new Date(data.createdAt).toLocaleDateString("en-IN", { month: 'short', year: 'numeric' }) : "Recent",
+            tier: "Registered"
+          });
+        });
+
+        // 2. Fetch Orders to Aggregate Spending and Orders Count
+        const q = query(collection(db, "orders"), orderBy("createdAt", "asc"));
+        const snapshot = await getDocs(q);
+        
+        snapshot.docs.forEach(doc => {
+          const data = doc.data();
+          // We prioritize matching by userId first, then email, then phone
+          // But our checkout primarily saves phone and sometimes userId
+          const identifierToMatch = data.userId || data.phone;
+          
+          if (!identifierToMatch) return;
+
+          // Find if we already have this user
+          let existingCustKey = null;
+          if (custMap.has(identifierToMatch)) {
+            existingCustKey = identifierToMatch;
+          } else {
+            // Check if phone matches any registered user (since sometimes they order logged out)
+            for (let [key, val] of custMap.entries()) {
+              if (val.phone === data.phone || val.id === data.userId) {
+                existingCustKey = key;
+                break;
+              }
+            }
+          }
+
+          const addressParts = (data.address || "").split(",");
+          const city = addressParts.length > 1 ? addressParts[addressParts.length - 2].trim() : "Unknown";
+
+          if (!existingCustKey) {
+            // Guest Checkout Customer (Not Registered)
+            custMap.set(identifierToMatch, {
+              id: identifierToMatch,
+              name: data.customer || "Unknown",
+              email: "N/A",
+              phone: data.phone || "N/A",
+              city: city,
+              totalOrders: 1,
+              totalSpent: data.totalAmount || 0,
+              joined: data.date ? data.date.split(",")[0] : "Recent",
+              tier: "Guest Patron"
+            });
+          } else {
+            // Update Existing Registered or Guest Customer
+            const cust = custMap.get(existingCustKey);
+            cust.totalOrders += 1;
+            cust.totalSpent += (data.totalAmount || 0);
+            if (cust.city === "N/A") cust.city = city; // Update city from order if it was N/A
+            custMap.set(existingCustKey, cust);
+          }
+        });
+
+        // Compute Tiers
+        const customersArray = Array.from(custMap.values()).map(c => {
+          if (c.totalSpent > 100000) c.tier = "VIP Bride Club";
+          else if (c.totalSpent > 50000) c.tier = "Silk Connoisseur";
+          else if (c.totalSpent > 0) c.tier = "Patron";
+          return c;
+        });
+
+        // Sort by total spent descending
+        customersArray.sort((a, b) => b.totalSpent - a.totalSpent);
+        setCustomers(customersArray);
+
+      } catch (error) {
+        console.error("Error fetching customers:", error);
+      } finally {
+        setLoading(false);
+      }
     }
-  ];
+    fetchCustomers();
+  }, []);
+
+
 
   const filtered = customers.filter(c => 
     c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -81,7 +127,7 @@ export default function AdminCustomersPage() {
         </div>
         <div className="flex items-center gap-2">
           <span className="px-3 py-1.5 rounded-full bg-amber-100 text-[#571520] font-bold text-xs">
-            1,420 Total Patrons
+            {loading ? "..." : customers.length.toLocaleString()} Total Patrons
           </span>
         </div>
       </div>
@@ -113,44 +159,54 @@ export default function AdminCustomersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100 font-medium">
-              {filtered.map((c) => (
-                <tr key={c.id} className="hover:bg-amber-50/20 transition-colors">
-                  <td className="py-3.5 px-4">
-                    <div className="font-bold text-stone-900">{c.name}</div>
-                    <span className={`inline-block mt-0.5 text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                      c.tier.includes("VIP") 
-                        ? "bg-amber-100 text-amber-900 border border-amber-200" 
-                        : "bg-stone-100 text-stone-700"
-                    }`}>
-                      {c.tier}
-                    </span>
-                  </td>
-
-                  <td className="py-3.5 px-4">
-                    <div className="text-stone-700">{c.email}</div>
-                    <div className="text-[11px] text-stone-400">{c.phone}</div>
-                  </td>
-
-                  <td className="py-3.5 px-4 text-stone-700">
-                    <div className="flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-stone-400" />
-                      <span>{c.city}</span>
-                    </div>
-                  </td>
-
-                  <td className="py-3.5 px-4">
-                    <span className="font-bold text-stone-900">{c.totalOrders}</span> orders
-                  </td>
-
-                  <td className="py-3.5 px-4 font-bold text-[#571520]">
-                    ₹{c.totalSpent.toLocaleString("en-IN")}
-                  </td>
-
-                  <td className="py-3.5 px-4 text-stone-500">
-                    {c.joined}
-                  </td>
+              {loading ? (
+                <tr>
+                  <td colSpan="6" className="text-center py-12 text-stone-500">Loading patrons...</td>
                 </tr>
-              ))}
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="text-center py-12 text-stone-500">No patrons found matching your search.</td>
+                </tr>
+              ) : (
+                filtered.map((c) => (
+                  <tr key={c.id} className="hover:bg-amber-50/20 transition-colors">
+                    <td className="py-3.5 px-4">
+                      <div className="font-bold text-stone-900">{c.name}</div>
+                      <span className={`inline-block mt-0.5 text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                        c.tier.includes("VIP") 
+                          ? "bg-amber-100 text-amber-900 border border-amber-200" 
+                          : "bg-stone-100 text-stone-700"
+                      }`}>
+                        {c.tier}
+                      </span>
+                    </td>
+
+                    <td className="py-3.5 px-4">
+                      <div className="text-stone-700">{c.email}</div>
+                      <div className="text-[11px] text-stone-400">{c.phone}</div>
+                    </td>
+
+                    <td className="py-3.5 px-4 text-stone-700">
+                      <div className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-stone-400" />
+                        <span>{c.city}</span>
+                      </div>
+                    </td>
+
+                    <td className="py-3.5 px-4">
+                      <span className="font-bold text-stone-900">{c.totalOrders}</span> orders
+                    </td>
+
+                    <td className="py-3.5 px-4 font-bold text-[#571520]">
+                      ₹{c.totalSpent.toLocaleString("en-IN")}
+                    </td>
+
+                    <td className="py-3.5 px-4 text-stone-500">
+                      {c.joined}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

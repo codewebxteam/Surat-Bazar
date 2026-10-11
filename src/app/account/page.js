@@ -21,6 +21,12 @@ import {
   Clock,
   ExternalLink
 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { auth, db } from "@/lib/firebase";
+import { signOut } from "firebase/auth";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { useCartWishlist } from "@/context/CartWishlistContext";
 import ProductCard from "@/components/ProductCard";
 import Navbar from "@/components/Navbar";
@@ -29,81 +35,126 @@ import Footer from "@/components/Footer";
 export default function AccountPage() {
   const [activeTab, setActiveTab] = useState("profile"); // "profile" | "orders" | "wishlist" | "addresses" | "track" | "returns"
   const { wishlist } = useCartWishlist();
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
 
-  const [trackQuery, setTrackQuery] = useState("SHR-98421");
+  const [userData, setUserData] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      fetchUserData();
+      fetchUserOrders();
+    }
+  }, [user, authLoading, router]);
+
+  async function fetchUserData() {
+    try {
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (userDoc.exists()) {
+        setUserData(userDoc.data());
+      }
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+    }
+  }
+
+  async function fetchUserOrders() {
+    try {
+      const q = query(collection(db, "orders"), where("userId", "==", user.uid));
+      const querySnapshot = await getDocs(q);
+      const ordersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      ordersData.sort((a, b) => {
+        const timeA = a.createdAt?.seconds 
+          ? a.createdAt.seconds * 1000 
+          : a.createdAt?.toDate 
+          ? a.createdAt.toDate().getTime() 
+          : (new Date(a.date || 0).getTime() || 0);
+        const timeB = b.createdAt?.seconds 
+          ? b.createdAt.seconds * 1000 
+          : b.createdAt?.toDate 
+          ? b.createdAt.toDate().getTime() 
+          : (new Date(b.date || 0).getTime() || 0);
+        return timeB - timeA;
+      });
+
+      setOrders(ordersData);
+    } catch (error) {
+      console.error("Error fetching user orders:", error);
+    } finally {
+      setLoadingData(false);
+    }
+  }
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push("/login");
+  };
+
+  const [trackQuery, setTrackQuery] = useState("");
   const [trackResult, setTrackResult] = useState(null);
-
-  const mockOrders = [
-    {
-      id: "SHR-98421",
-      date: "28 Sep 2026",
-      status: "In Transit (Express Air)",
-      estimatedDelivery: "04 Oct 2026",
-      courier: "BlueDart Apex Aviation • AWB #849201948",
-      total: 38500,
-      paymentMethod: "UPI (Google Pay)",
-      shippingAddress: "B-402, Heritage Imperial Towers, Golf Course Road, Gurgaon, Haryana - 122002",
-      items: [
-        {
-          name: "Rani Gulabi Katan Banarasi Kadwa Silk Saree",
-          image: "/banners/hero-2.png",
-          blouse: "Custom Bridal Stitch",
-          qty: 1,
-          price: 38500,
-        }
-      ]
-    },
-    {
-      id: "SHR-91204",
-      date: "14 Aug 2026",
-      status: "Delivered",
-      estimatedDelivery: "18 Aug 2026",
-      courier: "Delhivery Air Express • Delivered",
-      total: 24999,
-      paymentMethod: "Credit Card (HDFC Visa)",
-      shippingAddress: "B-402, Heritage Imperial Towers, Golf Course Road, Gurgaon, Haryana - 122002",
-      items: [
-        {
-          name: "Emerald Royale Scalloped Silk Georgette Saree",
-          image: "/banners/hero-1.png",
-          blouse: "Unstitched Piece",
-          qty: 1,
-          price: 24999,
-        }
-      ]
-    }
-  ];
-
-  const mockAddresses = [
-    {
-      id: 1,
-      type: "Home (Primary)",
-      name: "Sanskriti Sharma",
-      mobile: "+91 98765 43210",
-      address: "B-402, Heritage Imperial Towers, Sector 54, Golf Course Road",
-      city: "Gurgaon",
-      state: "Haryana",
-      pincode: "122002",
-      isDefault: true,
-    },
-    {
-      id: 2,
-      type: "Family Home / Bridal Venue",
-      name: "Sanskriti Sharma (C/O Singhania Estate)",
-      mobile: "+91 98111 22334",
-      address: "Villa 14, Royal Palm Boulevard, Mehrauli",
-      city: "New Delhi",
-      state: "Delhi",
-      pincode: "110030",
-      isDefault: false,
-    }
-  ];
-
+  
+  const userAddresses = userData?.addresses || [];
   const handleTrackSearch = (e) => {
     e.preventDefault();
-    const found = mockOrders.find((o) => o.id.toLowerCase() === trackQuery.trim().toLowerCase());
+    if (!trackQuery.trim()) return;
+    const found = orders.find((o) => o.id.toLowerCase() === trackQuery.trim().toLowerCase());
     setTrackResult(found || "not-found");
   };
+
+  if (authLoading || (loadingData && user)) {
+    return (
+      <>
+        <Navbar />
+        <div className="min-h-screen flex items-center justify-center bg-[#FAF7F2]">
+          <p className="text-stone-500 font-medium">Loading your profile...</p>
+        </div>
+        <Footer />
+      </>
+    );
+  }
+
+  if (!user) {
+    return (
+      <>
+        <Navbar />
+        <main className="min-h-screen bg-[#FAF7F2] flex items-center justify-center p-4">
+          <div className="bg-white max-w-md w-full rounded-3xl p-8 sm:p-12 text-center shadow-xl border border-amber-900/10">
+            <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <User className="w-10 h-10 text-amber-800" />
+            </div>
+            <h2 className="font-serif-luxury text-3xl font-bold text-[#3E0C15] mb-3">Welcome to Surat Bazar</h2>
+            <p className="text-stone-500 mb-8 text-sm">
+              Please log in or create an account to view your profile, track your orders, and access saved items.
+            </p>
+            <div className="space-y-4">
+              <Link 
+                href="/login" 
+                className="flex items-center justify-center w-full bg-[#3E0C15] text-[#F7EFCF] py-3.5 rounded-xl font-bold hover:bg-[#571520] transition-colors"
+              >
+                Log In to Your Account
+              </Link>
+              <Link 
+                href="/register" 
+                className="flex items-center justify-center w-full bg-white text-[#3E0C15] border-2 border-[#3E0C15] py-3.5 rounded-xl font-bold hover:bg-amber-50 transition-colors"
+              >
+                Create New Account
+              </Link>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
+  const displayInitial = userData?.name ? userData.name.charAt(0).toUpperCase() : "U";
+  const displayName = userData?.name || "Customer";
+  const displayEmail = userData?.email || user.email;
+  const displayPhone = userData?.phone || "+91 Not Provided";
+  const roleDisplay = userData?.role === "admin" ? "Admin" : "Member";
 
   return (
     <>
@@ -116,27 +167,27 @@ export default function AccountPage() {
           <div className="bg-white rounded-3xl border border-amber-900/10 p-6 sm:p-8 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-6 mb-8">
             <div className="flex items-center gap-4 text-center sm:text-left">
               <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#3E0C15] to-amber-700 text-[#F7EFCF] flex items-center justify-center font-serif-luxury text-2xl font-bold shadow-md">
-                S
+                {displayInitial}
               </div>
               <div>
                 <div className="flex items-center gap-2 justify-center sm:justify-start">
-                  <h1 className="font-serif-luxury text-2xl font-semibold text-stone-900">Sanskriti Sharma</h1>
+                  <h1 className="font-serif-luxury text-2xl font-semibold text-stone-900">{displayName}</h1>
                   <span className="text-[10px] uppercase font-bold tracking-wider bg-amber-100 text-[#3E0C15] px-2.5 py-0.5 rounded-full border border-amber-300">
-                    Royal Member
+                    {roleDisplay}
                   </span>
                 </div>
-                <p className="text-xs text-stone-500 mt-0.5">sanskriti.sharma@example.com • +91 98765 43210</p>
+                <p className="text-xs text-stone-500 mt-0.5">{displayEmail} • {displayPhone}</p>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
-              <Link
-                href="/account/login"
-                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full border border-stone-300 hover:border-rose-600 text-xs font-semibold text-stone-700 hover:text-rose-600 transition-colors"
+              <button
+                onClick={handleLogout}
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full border border-stone-300 hover:border-rose-600 text-xs font-semibold text-stone-700 hover:text-rose-600 transition-colors cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span>Logout</span>
-              </Link>
+              </button>
             </div>
           </div>
 
@@ -174,13 +225,13 @@ export default function AccountPage() {
               })}
 
               <div className="pt-2 border-t border-stone-100">
-                <Link
-                  href="/account/login"
-                  className="w-full flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs font-semibold text-rose-700 hover:bg-rose-50 transition-colors"
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs font-semibold text-rose-700 hover:bg-rose-50 transition-colors text-left"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Logout</span>
-                </Link>
+                </button>
               </div>
             </div>
 
@@ -198,15 +249,15 @@ export default function AccountPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm">
                     <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200">
                       <span className="text-stone-400 block text-[11px] uppercase tracking-wider">Full Name</span>
-                      <span className="font-bold text-stone-900 mt-1 block">Sanskriti Sharma</span>
+                      <span className="font-bold text-stone-900 mt-1 block">{displayName}</span>
                     </div>
                     <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200">
                       <span className="text-stone-400 block text-[11px] uppercase tracking-wider">Email Address</span>
-                      <span className="font-bold text-stone-900 mt-1 block">sanskriti.sharma@example.com</span>
+                      <span className="font-bold text-stone-900 mt-1 block">{displayEmail}</span>
                     </div>
                     <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200">
                       <span className="text-stone-400 block text-[11px] uppercase tracking-wider">Mobile Number</span>
-                      <span className="font-bold text-stone-900 mt-1 block">+91 98765 43210</span>
+                      <span className="font-bold text-stone-900 mt-1 block">{displayPhone}</span>
                     </div>
                     <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200">
                       <span className="text-stone-400 block text-[11px] uppercase tracking-wider">Privilege Tier</span>
@@ -235,40 +286,72 @@ export default function AccountPage() {
                   </div>
 
                   <div className="space-y-4">
-                    {mockOrders.map((order) => (
-                      <div key={order.id} className="p-5 rounded-2xl border border-stone-200 bg-stone-50/50 space-y-4">
-                        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-stone-200 text-xs">
-                          <div>
-                            <span className="text-stone-400">Order ID: </span>
-                            <span className="font-mono font-bold text-[#3E0C15]">{order.id}</span>
-                            <span className="text-stone-400 ml-3">Placed on: </span>
-                            <span className="font-semibold text-stone-800">{order.date}</span>
-                          </div>
-                          <span className="px-3 py-1 bg-amber-100 text-[#3E0C15] font-bold rounded-full text-[11px]">
-                            {order.status}
-                          </span>
-                        </div>
-
-                        {order.items.map((item, idx) => (
-                          <div key={idx} className="flex items-center gap-4">
-                            <div className="relative w-16 h-20 rounded-xl overflow-hidden bg-white border border-stone-200 shrink-0">
-                              <Image src={item.image} alt={item.name} fill className="object-cover" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-serif-luxury text-sm font-semibold text-stone-900 truncate">{item.name}</h4>
-                              <p className="text-xs text-stone-500 mt-0.5">{item.blouse} • Qty: {item.qty}</p>
-                              <p className="text-xs font-bold text-[#3E0C15] mt-1">₹{item.price.toLocaleString("en-IN")}</p>
-                            </div>
-                            <Link
-                              href={`/account/orders/${order.id}`}
-                              className="px-4 py-2 rounded-full border border-stone-300 hover:border-stone-800 text-xs font-semibold text-stone-800 transition-colors"
-                            >
-                              View Details
-                            </Link>
-                          </div>
-                        ))}
+                    {orders.length === 0 ? (
+                      <div className="p-8 text-center bg-stone-50 border border-stone-200 rounded-2xl">
+                        <Package className="w-8 h-8 text-stone-300 mx-auto mb-2" />
+                        <p className="text-xs text-stone-500">You haven't placed any orders yet.</p>
                       </div>
-                    ))}
+                    ) : (
+                      orders.map((order) => {
+                        const orderDateDisplay = order.date 
+                          ? order.date 
+                          : order.createdAt?.seconds 
+                          ? new Date(order.createdAt.seconds * 1000).toLocaleDateString("en-IN", { day: '2-digit', month: 'short', year: 'numeric' }) 
+                          : order.createdAt?.toDate 
+                          ? order.createdAt.toDate().toLocaleDateString("en-IN", { day: '2-digit', month: 'short', year: 'numeric' }) 
+                          : "Recent";
+
+                        return (
+                          <div key={order.id} className="p-5 rounded-2xl border border-stone-200 bg-stone-50/50 space-y-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-stone-200 text-xs">
+                              <div>
+                                <span className="text-stone-400">Order ID: </span>
+                                <span className="font-mono font-bold text-[#3E0C15]">{order.id}</span>
+                                <span className="text-stone-400 ml-3">Placed on: </span>
+                                <span className="font-semibold text-stone-800">
+                                  {orderDateDisplay}
+                                </span>
+                              </div>
+                              <span className={`px-3 py-1 font-bold rounded-full text-[11px] ${
+                                order.status === "Delivered" ? "bg-emerald-100 text-emerald-800" :
+                                order.status === "Dispatched" || order.status === "In Transit" ? "bg-sky-100 text-sky-800" :
+                                "bg-amber-100 text-[#3E0C15]"
+                              }`}>
+                                {order.status || "Processing"}
+                              </span>
+                            </div>
+
+                            {order.items && order.items.map((item, idx) => (
+                              <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                <div className="flex items-center gap-4">
+                                  <div className="relative w-16 h-20 rounded-xl overflow-hidden bg-white border border-stone-200 shrink-0">
+                                    <Image src={item.image || (item.images && item.images[0]) || "/placeholder.jpg"} alt={item.name} fill className="object-cover" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="font-serif-luxury text-sm font-semibold text-stone-900 truncate">{item.name}</h4>
+                                    <p className="text-xs text-stone-500 mt-0.5">
+                                      {item.blouseOption ? `${item.blouseOption} • ` : item.fabric ? `${item.fabric} • ` : item.color ? `${item.color} • ` : ""}Qty: {item.qty || item.quantity || 1}
+                                    </p>
+                                    <p className="text-xs font-bold text-[#3E0C15] mt-1">₹{(item.price || 0).toLocaleString("en-IN")}</p>
+                                  </div>
+                                </div>
+                                <Link
+                                  href={`/account/orders/${order.id}`}
+                                  onClick={() => {
+                                    try {
+                                      sessionStorage.setItem("suratbazar_view_order", JSON.stringify(order));
+                                    } catch (e) {}
+                                  }}
+                                  className="px-4 py-2 rounded-full border border-stone-300 hover:border-stone-800 text-xs font-semibold text-stone-800 hover:bg-stone-50 transition-colors self-end sm:self-center"
+                                >
+                                  View Details
+                                </Link>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               )}
@@ -312,19 +395,26 @@ export default function AccountPage() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {mockAddresses.map((addr) => (
-                      <div key={addr.id} className="p-5 rounded-2xl border border-stone-200 bg-stone-50/50 relative space-y-2 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-stone-900">{addr.type}</span>
-                          {addr.isDefault && (
-                            <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded">Default</span>
-                          )}
-                        </div>
-                        <p className="font-semibold text-stone-800">{addr.name}</p>
-                        <p className="text-stone-600 leading-relaxed">{addr.address}, {addr.city}, {addr.state} - {addr.pincode}</p>
-                        <p className="text-stone-500">Mobile: {addr.mobile}</p>
+                    {userAddresses.length === 0 ? (
+                      <div className="sm:col-span-2 p-8 text-center bg-stone-50 border border-stone-200 rounded-2xl">
+                        <MapPin className="w-8 h-8 text-stone-300 mx-auto mb-2" />
+                        <p className="text-xs text-stone-500">No saved addresses found.</p>
                       </div>
-                    ))}
+                    ) : (
+                      userAddresses.map((addr, idx) => (
+                        <div key={idx} className="p-5 rounded-2xl border border-stone-200 bg-stone-50/50 relative space-y-2 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-stone-900">{addr.type || "Address"}</span>
+                            {addr.isDefault && (
+                              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded">Default</span>
+                            )}
+                          </div>
+                          <p className="font-semibold text-stone-800">{addr.name}</p>
+                          <p className="text-stone-600 leading-relaxed">{addr.address}, {addr.city}, {addr.state} - {addr.pincode}</p>
+                          <p className="text-stone-500">Mobile: {addr.mobile}</p>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               )}
@@ -354,36 +444,36 @@ export default function AccountPage() {
                   </form>
 
                   {/* Tracking Timeline */}
-                  <div className="p-6 bg-stone-50 rounded-2xl border border-stone-200 space-y-4">
-                    <div className="flex items-center justify-between border-b border-stone-200 pb-3 text-xs">
-                      <div>
-                        <span className="text-stone-400">Tracking: </span>
-                        <strong className="text-stone-900 font-mono">SHR-98421</strong>
-                      </div>
-                      <span className="text-emerald-800 font-bold bg-emerald-100 px-2.5 py-0.5 rounded-full text-[11px]">
-                        ● On Schedule (Delivery: 04 Oct 2026)
-                      </span>
+                  {trackResult === "not-found" && (
+                    <div className="p-6 bg-red-50 text-red-700 rounded-2xl border border-red-100 text-sm font-medium">
+                      Order not found. Please check the Order ID and try again.
                     </div>
+                  )}
 
-                    <div className="space-y-3 text-xs">
-                      <div className="flex items-center gap-3 text-emerald-800 font-bold">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>Handcrafted on Varanasi Pit-loom & Silk Mark Tagged (28 Sep)</span>
+                  {trackResult && trackResult !== "not-found" && (
+                    <div className="p-6 bg-stone-50 rounded-2xl border border-stone-200 space-y-4">
+                      <div className="flex items-center justify-between border-b border-stone-200 pb-3 text-xs">
+                        <div>
+                          <span className="text-stone-400">Tracking: </span>
+                          <strong className="text-stone-900 font-mono">{trackResult.id}</strong>
+                        </div>
+                        <span className="text-emerald-800 font-bold bg-emerald-100 px-2.5 py-0.5 rounded-full text-[11px]">
+                          ● Status: {trackResult.status || "Processing"}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-3 text-emerald-800 font-bold">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span>Quality Verified & Sealed in Velvet Box (29 Sep)</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-amber-800 font-bold">
-                        <Clock className="w-4 h-4 text-amber-600 shrink-0" />
-                        <span>In Transit with BlueDart Aviation Express (30 Sep)</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-stone-400">
-                        <div className="w-4 h-4 rounded-full border-2 border-stone-300 shrink-0" />
-                        <span>Out for Doorstep Delivery (Expected 04 Oct)</span>
+
+                      <div className="space-y-3 text-xs">
+                        <div className="flex items-center gap-3 text-emerald-800 font-bold">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Order Placed Successfully ({trackResult.createdAt ? new Date(trackResult.createdAt).toLocaleDateString() : "N/A"})</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-amber-800 font-bold">
+                          <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                          <span>We are packing your items and dispatching soon</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
 
@@ -402,15 +492,27 @@ export default function AccountPage() {
 
                   <div className="space-y-3">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-stone-900">Eligible Past Orders</h4>
-                    <div className="p-4 rounded-2xl border border-stone-200 flex items-center justify-between">
-                      <div>
-                        <span className="font-bold text-xs text-stone-900 block">Emerald Royale Scalloped Silk Georgette Saree</span>
-                        <span className="text-[11px] text-stone-500">Delivered on 14 Aug 2026 • Order #SHR-91204</span>
+                    {orders.filter(o => o.status === "Delivered").length === 0 ? (
+                      <div className="p-4 text-xs text-stone-500 bg-stone-50 rounded-xl border border-stone-200">
+                        No delivered orders available for return or exchange right now.
                       </div>
-                      <button className="px-4 py-2 bg-[#3E0C15] text-[#F7EFCF] text-xs font-semibold rounded-full hover:bg-[#571520] transition-colors">
-                        Request Exchange
-                      </button>
-                    </div>
+                    ) : (
+                      orders.filter(o => o.status === "Delivered").map((order) => (
+                        <div key={order.id} className="p-4 rounded-2xl border border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div>
+                            <span className="font-bold text-xs text-stone-900 block">
+                              Order #{order.id}
+                            </span>
+                            <span className="text-[11px] text-stone-500">
+                              Delivered on {order.updatedAt ? new Date(order.updatedAt).toLocaleDateString() : "Recently"}
+                            </span>
+                          </div>
+                          <button className="px-4 py-2 bg-[#3E0C15] text-[#F7EFCF] text-xs font-semibold rounded-full hover:bg-[#571520] transition-colors whitespace-nowrap">
+                            Request Exchange
+                          </button>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               )}
