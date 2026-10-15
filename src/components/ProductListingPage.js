@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { 
   SlidersHorizontal, 
   ChevronDown, 
@@ -34,9 +35,13 @@ export default function ProductListingPage({
   breadcrumbs = [{ name: "Home", href: "/" }, { name: "Sarees", href: "/collections/sarees" }],
   filterCriteria = FILTER_CRITERIA,
 }) {
+  const router = useRouter();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dynamicCategories, setDynamicCategories] = useState([]);
+
+  // State to track if the page's route-level filter is active (can be cleared by user)
+  const [isRouteFilterActive, setIsRouteFilterActive] = useState(true);
 
   useEffect(() => {
     async function fetchProducts() {
@@ -175,14 +180,16 @@ export default function ProductListingPage({
   // Main Filter Logic encompassing all 7 facets
   const filteredProducts = useMemo(() => {
     return products.filter((item) => {
-      // 1. Initial Route Context Filter
-      if (filterType === "category" && filterValue && item.category !== filterValue && item.subcategory !== filterValue) return false;
-      if (filterType === "occasion" && filterValue && item.occasion !== filterValue) return false;
-      if (filterType === "fabric" && filterValue && item.fabric !== filterValue) return false;
-      if (filterType === "color" && filterValue && item.color !== filterValue) return false;
-      if (filterType === "sale" && !item.isSale) return false;
-      if (filterType === "new" && !item.isNewArrival) return false;
-      if (filterType === "bestseller" && !item.isBestseller) return false;
+      // 1. Initial Route Context Filter (can be cleared by user via Clear All)
+      if (isRouteFilterActive && filterType !== "all") {
+        if (filterType === "category" && filterValue && item.category !== filterValue && item.subcategory !== filterValue) return false;
+        if (filterType === "occasion" && filterValue && item.occasion !== filterValue) return false;
+        if (filterType === "fabric" && filterValue && item.fabric !== filterValue) return false;
+        if (filterType === "color" && filterValue && item.color !== filterValue) return false;
+        if (filterType === "sale" && !item.isSale) return false;
+        if (filterType === "new" && !item.isNewArrival) return false;
+        if (filterType === "bestseller" && !item.isBestseller) return false;
+      }
 
       // 2. Facet 1: Category
       if (selectedCategories.length > 0 && !selectedCategories.includes(item.category) && !selectedCategories.includes(item.subcategory)) return false;
@@ -222,6 +229,7 @@ export default function ProductListingPage({
       return 0; // default "featured"
     });
   }, [
+    isRouteFilterActive,
     filterType, 
     filterValue, 
     selectedCategories, 
@@ -232,7 +240,8 @@ export default function ProductListingPage({
     selectedOccasions, 
     selectedAvailability, 
     selectedMinDiscount, 
-    sortBy
+    sortBy,
+    products
   ]);
 
   const toggleArrayFilter = (setter, currentArr, value) => {
@@ -243,6 +252,7 @@ export default function ProductListingPage({
     }
   };
 
+  // Globalized Clear All Filters function - unconditionally removes all active facets, resets sorting, and unlocks route filter
   const clearAllFilters = () => {
     setSelectedCategories([]);
     setSelectedPriceBracket("all");
@@ -252,16 +262,27 @@ export default function ProductListingPage({
     setSelectedAvailability("all");
     setSelectedMinDiscount(0);
     setSortBy("featured");
+    setIsRouteFilterActive(false);
   };
 
-  const hasActiveFilters = 
-    selectedCategories.length > 0 || 
-    selectedPriceBracket !== "all" || 
-    selectedColors.length > 0 || 
-    selectedFabrics.length > 0 ||
-    selectedOccasions.length > 0 ||
-    selectedAvailability !== "all" ||
-    selectedMinDiscount > 0;
+  // Determine if a route-level category/collection constraint is currently limiting results
+  const isRouteConstrained = filterType !== "all" && isRouteFilterActive;
+
+  // Total count of active facet filters + sorting + route filter
+  const facetFiltersCount = 
+    selectedCategories.length +
+    (selectedPriceBracket !== "all" ? 1 : 0) +
+    selectedColors.length +
+    selectedFabrics.length +
+    selectedOccasions.length +
+    (selectedAvailability !== "all" ? 1 : 0) +
+    (selectedMinDiscount > 0 ? 1 : 0) +
+    (sortBy !== "featured" ? 1 : 0);
+
+  const activeFilterCount = facetFiltersCount + (isRouteConstrained ? 1 : 0);
+
+  // Active filters exist if any facet is applied, sort is altered, or route collection is active
+  const hasActiveFilters = activeFilterCount > 0;
 
   return (
     <div className="w-full bg-[#FAF7F2] min-h-screen">
@@ -347,8 +368,36 @@ export default function ProductListingPage({
             </span>
           </div>
 
-          {/* Right: Sort Dropdown */}
+          {/* Right: Sort Dropdown & Global Clear All */}
           <div className="flex items-center gap-2.5">
+            {/* Mobile Clear All quick action */}
+            {hasActiveFilters && (
+              <button
+                type="button"
+                id="mobile-quick-clear-btn"
+                onClick={clearAllFilters}
+                className="lg:hidden inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all cursor-pointer shadow-xs active:scale-95"
+                title="Clear all active filters"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Clear ({activeFilterCount})</span>
+              </button>
+            )}
+
+            {/* Desktop Top Bar Clear All button */}
+            {hasActiveFilters && (
+              <button
+                type="button"
+                id="topbar-clear-all-btn"
+                onClick={clearAllFilters}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all cursor-pointer shadow-xs active:scale-95"
+                title="Reset all active filters"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Clear All ({activeFilterCount})</span>
+              </button>
+            )}
+
             <span className="text-xs text-stone-500 font-medium hidden sm:inline">Sort By:</span>
             <div className="relative">
               <select
@@ -432,12 +481,49 @@ export default function ProductListingPage({
               </span>
             )}
 
+            {/* Sort Chip if changed */}
+            {sortBy !== "featured" && (
+              <span className="inline-flex items-center gap-1.5 text-xs bg-amber-100/80 text-[#3E0C15] px-3 py-1 rounded-full font-medium border border-amber-300/40">
+                <span>Sorted by: {sortBy.replace(/-/g, " ")}</span>
+                <X className="w-3 h-3 cursor-pointer hover:text-rose-600" onClick={() => setSortBy("featured")} />
+              </span>
+            )}
+
+            {/* Route Category Chip if locked */}
+            {filterType !== "all" && isRouteFilterActive && (
+              <span className="inline-flex items-center gap-1.5 text-xs bg-[#3E0C15] text-[#F7EFCF] px-3 py-1 rounded-full font-bold shadow-xs">
+                <span>Collection: {title}</span>
+                <X 
+                  className="w-3 h-3 cursor-pointer hover:text-amber-300" 
+                  onClick={() => setIsRouteFilterActive(false)} 
+                  title="Remove collection filter to view all sarees"
+                />
+              </span>
+            )}
+
+            {/* Route Category Unlocked Notice */}
+            {filterType !== "all" && !isRouteFilterActive && (
+              <span className="inline-flex items-center gap-1.5 text-xs bg-stone-200/80 text-stone-800 px-3 py-1 rounded-full font-medium border border-stone-300">
+                <span>All Sarees (Collection unlocked)</span>
+                <button
+                  type="button"
+                  onClick={() => setIsRouteFilterActive(true)}
+                  className="text-[#3E0C15] hover:text-amber-800 font-bold underline cursor-pointer ml-1"
+                >
+                  Re-filter &ldquo;{title}&rdquo;
+                </button>
+              </span>
+            )}
+
             <button
+              type="button"
+              id="chips-clear-all-btn"
               onClick={clearAllFilters}
-              className="text-xs text-rose-700 hover:text-rose-900 underline underline-offset-4 flex items-center gap-1 font-semibold ml-2 cursor-pointer"
+              className="text-xs text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3.5 py-1 rounded-full flex items-center gap-1.5 font-bold cursor-pointer transition-all active:scale-95 ml-2 shadow-xs"
+              title="Clear all filters and reset"
             >
-              <RotateCcw className="w-3 h-3" />
-              <span>Clear All</span>
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Clear All ({activeFilterCount})</span>
             </button>
           </div>
         )}
@@ -449,11 +535,23 @@ export default function ProductListingPage({
           {!isSidebarCollapsed && (
             <aside className="hidden lg:block lg:col-span-3 space-y-5 sticky top-28 max-h-[85vh] overflow-y-auto pr-3 bg-white p-5 rounded-2xl border border-amber-900/10 shadow-sm">
               <div className="flex items-center justify-between pb-3 border-b border-stone-200">
-                <span className="font-serif-luxury text-lg font-bold text-[#3E0C15]">Filters</span>
-                {hasActiveFilters && (
-                  <button onClick={clearAllFilters} className="text-xs text-amber-800 hover:underline cursor-pointer">
-                    Reset All
+                <div className="flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-[#3E0C15]" />
+                  <span className="font-serif-luxury text-lg font-bold text-[#3E0C15]">Filters</span>
+                </div>
+                {hasActiveFilters ? (
+                  <button 
+                    type="button"
+                    id="sidebar-header-clear-btn"
+                    onClick={clearAllFilters} 
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all cursor-pointer shadow-xs active:scale-95"
+                    title="Reset all filters"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Clear All ({activeFilterCount})</span>
                   </button>
+                ) : (
+                  <span className="text-[11px] text-stone-400 font-medium">7 Facets</span>
                 )}
               </div>
 
@@ -649,6 +747,21 @@ export default function ProductListingPage({
                 )}
               </div>
 
+              {/* Persistent Bottom Clear Button in Sidebar */}
+              {hasActiveFilters && (
+                <div className="pt-3 border-t border-stone-100">
+                  <button
+                    type="button"
+                    id="sidebar-bottom-clear-btn"
+                    onClick={clearAllFilters}
+                    className="w-full py-2.5 px-3 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-xs"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Clear All Filters ({activeFilterCount})</span>
+                  </button>
+                </div>
+              )}
+
             </aside>
           )}
 
@@ -656,9 +769,9 @@ export default function ProductListingPage({
           <main className={`${isSidebarCollapsed ? "lg:col-span-12" : "lg:col-span-9"}`}>
             {filteredProducts.length > 0 ? (
               <div 
-                className={`grid grid-cols-2 gap-3.5 sm:gap-5 md:gap-6 ${
+                className={`grid grid-cols-2 gap-2.5 sm:gap-4 md:gap-5 ${
                   isSidebarCollapsed 
-                    ? "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4" 
+                    ? "sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5" 
                     : "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4"
                 }`}
               >
@@ -675,12 +788,29 @@ export default function ProductListingPage({
                 <p className="text-xs sm:text-sm text-stone-500 mt-2 max-w-md mx-auto leading-relaxed">
                   We could not find any drapes matching the selected combination of filters. Try resetting to explore our full treasury.
                 </p>
-                <button
-                  onClick={clearAllFilters}
-                  className="mt-6 px-8 py-3 rounded-full bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] text-xs font-semibold transition-all shadow cursor-pointer"
-                >
-                  Clear All Filters
-                </button>
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    id="empty-state-clear-btn"
+                    onClick={clearAllFilters}
+                    className="px-8 py-3.5 rounded-full bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] text-xs font-bold transition-all shadow cursor-pointer flex items-center gap-2 active:scale-95"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    <span>Clear All Filters</span>
+                  </button>
+                  {filterType !== "all" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearAllFilters();
+                        router.push("/collections/sarees");
+                      }}
+                      className="px-6 py-3.5 rounded-full border border-stone-300 hover:border-stone-800 text-stone-800 text-xs font-bold transition-all cursor-pointer active:scale-95 hover:bg-stone-50"
+                    >
+                      <span>Explore All Sarees</span>
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </main>
@@ -698,13 +828,31 @@ export default function ProductListingPage({
                 <div className="flex items-center gap-2">
                   <SlidersHorizontal className="w-4 h-4 text-[#3E0C15]" />
                   <h3 className="font-serif-luxury text-2xl font-bold text-[#3E0C15]">All Filters</h3>
+                  {activeFilterCount > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 text-xs font-bold">
+                      {activeFilterCount}
+                    </span>
+                  )}
                 </div>
-                <button 
-                  onClick={() => setIsMobileFilterOpen(false)} 
-                  className="p-1.5 rounded-full bg-stone-200 text-stone-700"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {hasActiveFilters && (
+                    <button
+                      type="button"
+                      id="mobile-drawer-header-clear-btn"
+                      onClick={clearAllFilters}
+                      className="text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-1 rounded-full flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>Clear All</span>
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => setIsMobileFilterOpen(false)} 
+                    className="p-1.5 rounded-full bg-stone-200 text-stone-700 cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               {/* 1. Mobile Category */}
@@ -843,16 +991,25 @@ export default function ProductListingPage({
             {/* Mobile Actions */}
             <div className="pt-4 border-t border-stone-300 flex gap-3 sticky bottom-0 bg-[#FAF7F2]">
               <button
+                type="button"
+                id="mobile-drawer-bottom-clear-btn"
                 onClick={clearAllFilters}
-                className="flex-1 py-3 text-xs font-semibold rounded-full border border-stone-400 text-stone-800 active:scale-95"
+                disabled={!hasActiveFilters}
+                className={`flex-1 py-3 text-xs font-bold rounded-full border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  hasActiveFilters 
+                    ? "border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 active:scale-95" 
+                    : "border-stone-200 bg-stone-100 text-stone-400 cursor-not-allowed"
+                }`}
               >
-                Reset
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Clear All {hasActiveFilters ? `(${activeFilterCount})` : ""}</span>
               </button>
               <button
+                type="button"
                 onClick={() => setIsMobileFilterOpen(false)}
-                className="flex-1 py-3 text-xs font-semibold rounded-full bg-[#3E0C15] text-[#F7EFCF] active:scale-95 shadow"
+                className="flex-1 py-3 text-xs font-bold rounded-full bg-[#3E0C15] text-[#F7EFCF] active:scale-95 shadow cursor-pointer"
               >
-                Apply ({filteredProducts.length})
+                Show Results ({filteredProducts.length})
               </button>
             </div>
           </div>

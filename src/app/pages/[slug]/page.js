@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
@@ -21,98 +21,12 @@ import {
   CheckCircle2, 
   Award,
   ChevronRight,
-  Send,
-  Check
+  Check,
+  MessageCircle,
+  ExternalLink
 } from "lucide-react";
 
-function ContactUsForm() {
-  const [submitted, setSubmitted] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", mobile: "", message: "" });
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setSubmitted(true);
-  };
-
-  if (submitted) {
-    return (
-      <div className="bg-emerald-950/20 border border-emerald-500/40 rounded-3xl p-8 text-center space-y-3 animate-in fade-in">
-        <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto">
-          <Check className="w-6 h-6" />
-        </div>
-        <h3 className="font-serif-luxury text-xl font-bold text-stone-900">Message Received</h3>
-        <p className="text-xs text-stone-600 leading-relaxed max-w-sm mx-auto">
-          Thank you, <strong>{form.name}</strong>. Our senior styling concierge will connect with you within 2 hours.
-        </p>
-        <button
-          onClick={() => {
-            setSubmitted(false);
-            setForm({ name: "", email: "", mobile: "", message: "" });
-          }}
-          className="text-xs text-[#3E0C15] font-semibold underline cursor-pointer"
-        >
-          Send another message
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="bg-white p-6 sm:p-8 rounded-3xl border border-amber-900/15 shadow-sm space-y-4 text-xs">
-      <h3 className="font-serif-luxury text-xl font-bold text-[#3E0C15]">Send a Concierge Message</h3>
-      <div>
-        <label className="block text-stone-700 font-bold mb-1">Your Name *</label>
-        <input 
-          type="text" 
-          required
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          placeholder="e.g. Radhika Singhania" 
-          className="w-full bg-[#FAF7F2] border border-stone-300 rounded-xl p-3 text-stone-900 focus:outline-none focus:border-[#3E0C15]" 
-        />
-      </div>
-      <div>
-        <label className="block text-stone-700 font-bold mb-1">Email Address *</label>
-        <input 
-          type="email" 
-          required
-          value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
-          placeholder="radhika@example.com" 
-          className="w-full bg-[#FAF7F2] border border-stone-300 rounded-xl p-3 text-stone-900 focus:outline-none focus:border-[#3E0C15]" 
-        />
-      </div>
-      <div>
-        <label className="block text-stone-700 font-bold mb-1">Contact Mobile Number</label>
-        <input 
-          type="tel" 
-          value={form.mobile}
-          onChange={(e) => setForm({ ...form, mobile: e.target.value })}
-          placeholder="+91 98765 43210" 
-          className="w-full bg-[#FAF7F2] border border-stone-300 rounded-xl p-3 text-stone-900 focus:outline-none focus:border-[#3E0C15]" 
-        />
-      </div>
-      <div>
-        <label className="block text-stone-700 font-bold mb-1">Inquiry / Bridal Request *</label>
-        <textarea 
-          rows={3} 
-          required
-          value={form.message}
-          onChange={(e) => setForm({ ...form, message: e.target.value })}
-          placeholder="Tell us about your wedding date, weave preference, or styling questions..." 
-          className="w-full bg-[#FAF7F2] border border-stone-300 rounded-xl p-3 text-stone-900 focus:outline-none focus:border-[#3E0C15]" 
-        />
-      </div>
-      <button 
-        type="submit" 
-        className="w-full py-3.5 bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] font-bold text-xs uppercase tracking-widest rounded-full transition-all shadow cursor-pointer active:scale-95 flex items-center justify-center gap-2"
-      >
-        <span>Submit Inquiry</span>
-        <Send className="w-3.5 h-3.5" />
-      </button>
-    </form>
-  );
-}
 
 const STATIC_PAGES_DATA = {
   // 1. ABOUT US
@@ -166,39 +80,228 @@ const STATIC_PAGES_DATA = {
 
   // 2. CONTACT US
   "contact-us": {
-    badge: "Concierge & Styling",
-    title: "Connect with Our Flagship Concierge",
-    subtitle: "We are delighted to assist you with styling advice, private bridal salon appointments, and customized commissions.",
+    badge: "Direct Patron Concierge",
+    title: "Get in Touch with Suratbazar",
+    subtitle: "Direct access to our master styling team, order assistance, and Surat flagship boutique. Connect instantly via WhatsApp, Phone, or Email without any waiting forms.",
     content: (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-stone-700">
-        <div className="space-y-4">
-          <div className="flex items-start gap-3 p-5 bg-white rounded-2xl border border-stone-200 shadow-sm">
-            <MapPin className="w-5 h-5 text-amber-700 shrink-0 mt-1" />
-            <div>
-              <h4 className="font-bold text-stone-900 text-sm">Flagship Heritage Boutique</h4>
-              <p className="text-xs text-stone-500 mt-1">Heritage Lane, Near Qutub Minar, Mehrauli, New Delhi - 110030</p>
-              <p className="text-[11px] text-amber-800 font-medium mt-1">Open All 7 Days: 10:30 AM – 8:30 PM IST</p>
+      <div className="space-y-8 text-stone-700">
+        
+        {/* Top 3 Direct Contact Channels Grid: WhatsApp | Direct Call | Official Email */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          
+          {/* Card 1: WhatsApp Concierge */}
+          <div className="p-6 bg-white rounded-3xl border border-emerald-500/30 shadow-xs flex flex-col justify-between space-y-4 hover:border-emerald-500 transition-all group bg-gradient-to-b from-white to-emerald-50/20">
+            <div className="space-y-2">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                <MessageCircle className="w-5 h-5" />
+              </div>
+              <span className="text-[10px] uppercase font-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full inline-block">
+                Fastest Response
+              </span>
+              <h3 className="font-serif-luxury text-lg font-bold text-stone-900">WhatsApp Concierge</h3>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                Connect directly for live saree video drapes, blouse custom sizing, or quick order status.
+              </p>
+              <div className="pt-2">
+                <span className="text-[11px] font-semibold text-stone-500 block">WhatsApp Number:</span>
+                <span className="font-bold text-base text-[#3E0C15]">+91 82002 60300</span>
+              </div>
+              <p className="text-[11px] text-emerald-700 font-medium">1-on-1 Master Draper Support</p>
             </div>
+
+            <a
+              href="https://wa.me/918200260300?text=Hello%20Suratbazar%2C%20I%20have%20an%20inquiry%20regarding%20sarees"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-3 px-4 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-xs transition-all active:scale-95 text-center"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>Chat on WhatsApp</span>
+            </a>
           </div>
-          <div className="flex items-start gap-3 p-5 bg-white rounded-2xl border border-stone-200 shadow-sm">
-            <Phone className="w-5 h-5 text-amber-700 shrink-0 mt-1" />
-            <div>
-              <h4 className="font-bold text-stone-900 text-sm">Phone & WhatsApp Concierge</h4>
-              <p className="text-xs text-stone-500 mt-1">+91 98765 43210 / +91 11 4982 0000</p>
-              <p className="text-[11px] text-emerald-700 font-medium mt-1">Dedicated 1-on-1 Master Draper Support</p>
+
+          {/* Card 2: Direct Call Helpline */}
+          <div className="p-6 bg-white rounded-3xl border border-amber-900/15 shadow-xs flex flex-col justify-between space-y-4 hover:border-amber-700 transition-all group bg-gradient-to-b from-white to-amber-50/20">
+            <div className="space-y-2">
+              <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-900 flex items-center justify-center">
+                <Phone className="w-5 h-5" />
+              </div>
+              <span className="text-[10px] uppercase font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full inline-block">
+                Direct Helpline
+              </span>
+              <h3 className="font-serif-luxury text-lg font-bold text-stone-900">Direct Call Concierge</h3>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                Speak directly with our senior styling concierge and master textile advisors.
+              </p>
+              <div className="pt-2">
+                <span className="text-[11px] font-semibold text-stone-500 block">Helpline Number:</span>
+                <span className="font-bold text-base text-[#3E0C15]">+91 82002 60300</span>
+              </div>
+              <p className="text-[11px] text-amber-800 font-medium">Open All 7 Days: 10:00 AM – 9:00 PM IST</p>
             </div>
+
+            <a
+              href="tel:+918200260300"
+              className="w-full py-3 px-4 rounded-full bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-xs transition-all active:scale-95 text-center"
+            >
+              <Phone className="w-4 h-4" />
+              <span>Call +91 82002 60300</span>
+            </a>
           </div>
-          <div className="flex items-start gap-3 p-5 bg-white rounded-2xl border border-stone-200 shadow-sm">
-            <Mail className="w-5 h-5 text-amber-700 shrink-0 mt-1" />
-            <div>
-              <h4 className="font-bold text-stone-900 text-sm">Email Inquiries</h4>
-              <p className="text-xs text-stone-500 mt-1">support@suratbazar.com • bridal@suratbazar.com</p>
+
+          {/* Card 3: Official Email Support */}
+          <div className="p-6 bg-white rounded-3xl border border-amber-900/15 shadow-xs flex flex-col justify-between space-y-4 hover:border-amber-700 transition-all group bg-gradient-to-b from-white to-stone-50/40">
+            <div className="space-y-2">
+              <div className="w-10 h-10 rounded-2xl bg-stone-100 text-stone-800 flex items-center justify-center">
+                <Mail className="w-5 h-5" />
+              </div>
+              <span className="text-[10px] uppercase font-bold text-stone-700 bg-stone-200 px-2.5 py-0.5 rounded-full inline-block">
+                Official Desk
+              </span>
+              <h3 className="font-serif-luxury text-lg font-bold text-stone-900">Official Email Support</h3>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                For order inquiries, custom bridal commissions, and corporate partnerships.
+              </p>
+              <div className="pt-2">
+                <span className="text-[11px] font-semibold text-stone-500 block">Email Address:</span>
+                <span className="font-bold text-xs text-[#3E0C15] break-all block">suratbazar360@gmail.com</span>
+              </div>
+              <p className="text-[11px] text-stone-500">Replies within 2 to 4 business hours</p>
+            </div>
+
+            <a
+              href="mailto:suratbazar360@gmail.com"
+              className="w-full py-3 px-4 rounded-full bg-stone-800 hover:bg-stone-900 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-xs transition-all active:scale-95 text-center"
+            >
+              <Mail className="w-4 h-4" />
+              <span>Email Us</span>
+            </a>
+          </div>
+
+        </div>
+
+        {/* Surat Registered Office & Physical Flagship Experience Center */}
+        <div className="p-6 sm:p-8 bg-white rounded-3xl border border-amber-900/15 shadow-xs space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-100">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-900 flex items-center justify-center shrink-0">
+                <MapPin className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider">Registered Entity &amp; Boutique</span>
+                <h3 className="font-serif-luxury text-xl font-bold text-stone-900">
+                  Surat Main Head Office &amp; Experience Studio
+                </h3>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold shrink-0 self-start sm:self-auto">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Open All 7 Days (10 AM – 9 PM)</span>
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs sm:text-sm">
+            <div className="space-y-3">
+              <h4 className="font-bold text-stone-900 uppercase tracking-wider text-xs">Official Physical Address:</h4>
+              <div className="space-y-1.5 p-4 rounded-2xl bg-stone-50 border border-stone-200/80 text-stone-700 leading-relaxed font-mono text-xs">
+                <p><strong>Building / Flat No.:</strong> HUT NO-287</p>
+                <p><strong>Premises / Building:</strong> MITHI KHADI</p>
+                <p><strong>Road / Street:</strong> AZAD CHOWK</p>
+                <p><strong>Nearby Landmark:</strong> NEAR NOORANI MASJID</p>
+                <p><strong>Locality / Area:</strong> LIMBAYAT</p>
+                <p><strong>City &amp; District:</strong> Surat, Gujarat</p>
+                <p><strong>PIN Code:</strong> 394210</p>
+                <p><strong>Country:</strong> India</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 flex flex-col justify-between">
+              <div className="space-y-3">
+                <h4 className="font-bold text-stone-900 uppercase tracking-wider text-xs">Operating Hours &amp; Visits:</h4>
+                <div className="space-y-2 text-xs text-stone-600">
+                  <p className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-amber-800 shrink-0" />
+                    <span><strong>Monday – Sunday:</strong> 10:00 AM – 9:00 PM IST</span>
+                  </p>
+                  <p className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <span>Private bridal appointments available upon prior notice</span>
+                  </p>
+                  <p className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-amber-800 shrink-0" />
+                    <span>100% Silk Mark Authenticated collection preview</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3 pt-2">
+                <a
+                  href="https://www.google.com/maps/search/?api=1&query=Mithi+Khadi+Azad+Chowk+Limbayat+Surat+394210"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-stone-900 hover:bg-stone-800 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-xs"
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>View on Google Maps</span>
+                  <ExternalLink className="w-3 h-3 text-stone-400" />
+                </a>
+                <a
+                  href="tel:+918200260300"
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-amber-100 hover:bg-amber-200 text-[#3E0C15] font-bold text-xs uppercase tracking-wider transition-all"
+                >
+                  <Phone className="w-3.5 h-3.5" />
+                  <span>Call Office</span>
+                </a>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Interactive Contact Form */}
-        <ContactUsForm />
+        {/* Quick Self-Service Links: Track Order | Returns | FAQs */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+          <Link
+            href="/track"
+            className="p-4 bg-white rounded-2xl border border-stone-200 hover:border-amber-700 transition-all shadow-xs flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3">
+              <Truck className="w-5 h-5 text-amber-800 shrink-0" />
+              <div>
+                <h5 className="font-bold text-stone-900 text-xs">Track Your Order</h5>
+                <p className="text-[11px] text-stone-500">Live courier tracking</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-stone-400 group-hover:text-amber-800 group-hover:translate-x-0.5 transition-all" />
+          </Link>
+
+          <Link
+            href="/refund-policy"
+            className="p-4 bg-white rounded-2xl border border-stone-200 hover:border-amber-700 transition-all shadow-xs flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3">
+              <RotateCcw className="w-5 h-5 text-amber-800 shrink-0" />
+              <div>
+                <h5 className="font-bold text-stone-900 text-xs">Easy 7-Day Returns</h5>
+                <p className="text-[11px] text-stone-500">Doorstep reverse pickup</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-stone-400 group-hover:text-amber-800 group-hover:translate-x-0.5 transition-all" />
+          </Link>
+
+          <Link
+            href="/pages/faq"
+            className="p-4 bg-white rounded-2xl border border-stone-200 hover:border-amber-700 transition-all shadow-xs flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3">
+              <HelpCircle className="w-5 h-5 text-amber-800 shrink-0" />
+              <div>
+                <h5 className="font-bold text-stone-900 text-xs">Read FAQs</h5>
+                <p className="text-[11px] text-stone-500">Silk care, sizing &amp; orders</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-stone-400 group-hover:text-amber-800 group-hover:translate-x-0.5 transition-all" />
+          </Link>
+        </div>
+
       </div>
     )
   },
@@ -366,7 +469,7 @@ const STATIC_PAGES_DATA = {
           },
           {
             q: "Can I cancel or modify my order?",
-            a: "Orders can be modified or cancelled within 12 hours of placement before our looms dispatch the package. Simply contact our concierge at +91 98765 43210."
+            a: "Orders can be modified or cancelled within 12 hours of placement before our looms dispatch the package. Simply contact our concierge on Call/WhatsApp at +91 82002 60300 or email suratbazar360@gmail.com."
           },
           {
             q: "What payment methods are accepted?",
@@ -448,6 +551,12 @@ const STATIC_PAGES_DATA = {
     subtitle: "Experience the tactile majesty of authentic Indian handlooms in person.",
     content: (
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs sm:text-sm text-stone-700">
+        <div className="p-6 bg-white rounded-3xl border border-amber-900/15 shadow-sm space-y-2 col-span-1 sm:col-span-2 bg-gradient-to-br from-white to-amber-50/40">
+          <span className="text-[10px] font-bold text-[#9E7D2E] uppercase tracking-wider">Surat Headquarters &amp; Flagship Boutique</span>
+          <h4 className="font-serif-luxury text-lg font-bold text-stone-900">Surat Main Loom &amp; Retail Studio</h4>
+          <p className="text-stone-600">Hut No. 287, Mithi Khadi, Azad Chowk, Near Noorani Masjid, Limbayat, Surat, Gujarat - 394210</p>
+          <p className="text-stone-500">Phone &amp; WhatsApp: +91 82002 60300 • Email: suratbazar360@gmail.com • Hours: 10:00 AM – 9:00 PM (All Days)</p>
+        </div>
         <div className="p-6 bg-white rounded-3xl border border-amber-900/15 shadow-sm space-y-2">
           <span className="text-[10px] font-bold text-[#9E7D2E] uppercase tracking-wider">New Delhi Flagship</span>
           <h4 className="font-serif-luxury text-lg font-bold text-stone-900">Mehrauli Heritage Salon</h4>
@@ -483,7 +592,13 @@ const STATIC_PAGES_DATA = {
 // Aliases mapping
 STATIC_PAGES_DATA["silk-care"] = STATIC_PAGES_DATA["care-guide"];
 STATIC_PAGES_DATA["returns"] = STATIC_PAGES_DATA["return-policy"];
+STATIC_PAGES_DATA["refund-policy"] = STATIC_PAGES_DATA["return-policy"];
+STATIC_PAGES_DATA["cancellation-policy"] = STATIC_PAGES_DATA["return-policy"];
 STATIC_PAGES_DATA["terms-of-service"] = STATIC_PAGES_DATA["terms-conditions"];
+STATIC_PAGES_DATA["terms-and-conditions"] = STATIC_PAGES_DATA["terms-conditions"];
+STATIC_PAGES_DATA["terms"] = STATIC_PAGES_DATA["terms-conditions"];
+STATIC_PAGES_DATA["privacy"] = STATIC_PAGES_DATA["privacy-policy"];
+STATIC_PAGES_DATA["contact"] = STATIC_PAGES_DATA["contact-us"];
 
 export default function StaticPage({ params }) {
   const unwrapped = use(params);

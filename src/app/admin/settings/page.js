@@ -15,9 +15,9 @@ import {
 
 export default function AdminSettingsPage() {
   const [storeName, setStoreName] = useState("Suratbazar");
-  const [supportEmail, setSupportEmail] = useState("care@suratbazar.com");
-  const [supportPhone, setSupportPhone] = useState("+91 98765 43210");
-  const [address, setAddress] = useState("Tower B, Ring Road Silk Market, Surat, Gujarat - 395002");
+  const [supportEmail, setSupportEmail] = useState("suratbazar360@gmail.com");
+  const [supportPhone, setSupportPhone] = useState("+91 82002 60300");
+  const [address, setAddress] = useState("Hut No. 287, Mithi Khadi, Azad Chowk, Near Noorani Masjid, Limbayat, Surat, Gujarat - 394210");
   const [freeShippingAbove, setFreeShippingAbove] = useState("5000");
   const [codEnabled, setCodEnabled] = useState(true);
   const [saved, setSaved] = useState(false);

@@ -79,10 +79,10 @@ export default function ProductCard({ product }) {
 
   return (
     <>
-      <div className="group bg-white rounded-2xl overflow-hidden border border-amber-900/10 hover:border-amber-500/30 hover:shadow-2xl transition-all duration-300 flex flex-col h-full relative">
+      <div className="group bg-white rounded-xl sm:rounded-2xl overflow-hidden border border-amber-900/10 hover:border-amber-500/30 hover:shadow-xl transition-all duration-300 flex flex-col h-full relative">
         
-        {/* Top Image Container */}
-        <div className="relative aspect-[3/4] w-full overflow-hidden bg-stone-100">
+        {/* Top Image Container - Compact & responsive */}
+        <div className="relative aspect-[4/5] sm:aspect-[3/4] w-full overflow-hidden bg-stone-100">
           <Link 
             href={`/product/${product.slug}`} 
             className="block w-full h-full relative cursor-pointer"
@@ -108,65 +108,65 @@ export default function ProductCard({ product }) {
             )}
           </Link>
 
-          {/* Badges (New / Bestseller / Sale / Discount) */}
-          <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5 z-10 pointer-events-none">
-            {product.isBestseller && (
-              <span className="bg-[#3E0C15] text-[#F3E5C8] text-[9px] sm:text-[10px] uppercase font-bold tracking-widest px-2.5 py-0.5 rounded-full shadow-md backdrop-blur-sm border border-amber-500/30">
+          {/* Badges - Ultra sleek, compact & subtle without blocking the photo */}
+          <div className="absolute top-2 left-2 flex flex-row flex-wrap items-center gap-1 z-10 pointer-events-none max-w-[75%]">
+            {product.isBestseller ? (
+              <span className="bg-[#2D0A10]/90 text-[#F7EFCF] text-[8px] sm:text-[9px] uppercase font-bold tracking-wider px-1.5 sm:px-2 py-0.5 rounded shadow-xs backdrop-blur-xs border border-amber-400/20">
                 Bestseller
               </span>
-            )}
-            {product.isNewArrival && (
-              <span className="bg-gradient-to-r from-amber-600 to-amber-500 text-stone-950 text-[9px] sm:text-[10px] uppercase font-bold tracking-widest px-2.5 py-0.5 rounded-full shadow-md">
+            ) : product.isNewArrival ? (
+              <span className="bg-amber-600/90 text-stone-950 text-[8px] sm:text-[9px] uppercase font-bold tracking-wider px-1.5 sm:px-2 py-0.5 rounded shadow-xs backdrop-blur-xs">
                 New
               </span>
-            )}
+            ) : null}
+
             {discountPercent > 0 && (
-              <span className="bg-emerald-700/90 text-white text-[9px] sm:text-[10px] uppercase font-bold tracking-widest px-2.5 py-0.5 rounded-full shadow-md">
+              <span className="bg-emerald-800/90 text-white text-[8px] sm:text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded shadow-xs backdrop-blur-xs">
                 {discountPercent}% OFF
               </span>
             )}
           </div>
 
-          {/* Wishlist Button - strictly stops propagation */}
+          {/* Wishlist Button - Compact & discreet */}
           <button
             onClick={handleWishlistClick}
             aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
             title={wishlisted ? "Remove from wishlist" : "Save to wishlist"}
-            className={`absolute top-2.5 right-2.5 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full backdrop-blur-md flex items-center justify-center transition-all cursor-pointer ${
+            className={`absolute top-2 right-2 z-20 w-7 h-7 sm:w-8 sm:h-8 rounded-full backdrop-blur-md flex items-center justify-center transition-all cursor-pointer ${
               wishlisted 
-                ? "bg-rose-50 text-rose-600 border border-rose-200 shadow-md scale-105" 
-                : "bg-white/80 hover:bg-white text-stone-700 hover:text-rose-600 shadow-sm hover:scale-105"
+                ? "bg-rose-50 text-rose-600 border border-rose-200 shadow-sm scale-105" 
+                : "bg-white/80 hover:bg-white text-stone-700 hover:text-rose-600 shadow-xs hover:scale-105"
             }`}
           >
             <Heart 
-              className={`w-4 h-4 transition-transform duration-200 ${
+              className={`w-3.5 h-3.5 transition-transform duration-200 ${
                 wishlisted ? "fill-rose-600 text-rose-600 scale-110" : ""
               }`} 
             />
           </button>
 
           {/* Desktop Hover Floating Action Bar (Quick View + Quick Add) */}
-          <div className="absolute inset-x-2.5 bottom-2.5 z-20 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 hidden sm:flex gap-1.5">
+          <div className="absolute inset-x-2 bottom-2 z-20 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-1 group-hover:translate-y-0 hidden sm:flex gap-1.5">
             <button
               onClick={handleOpenQuickView}
-              className="flex-1 bg-white/95 hover:bg-white text-stone-900 backdrop-blur-md text-[11px] font-bold py-2.5 px-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-lg active:scale-95 cursor-pointer border border-stone-200/80"
+              className="flex-1 bg-white/95 hover:bg-white text-stone-900 backdrop-blur-md text-[10px] font-bold py-2 px-1.5 rounded-lg flex items-center justify-center gap-1 transition-colors shadow-md active:scale-95 cursor-pointer border border-stone-200/80"
             >
-              <Eye className="w-3.5 h-3.5 text-amber-800" />
+              <Eye className="w-3 h-3 text-amber-800" />
               <span>Quick View</span>
             </button>
 
             <button
               onClick={handleQuickAdd}
-              className="flex-1 bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] text-[11px] font-bold py-2.5 px-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-lg active:scale-95 cursor-pointer"
+              className="flex-1 bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] text-[10px] font-bold py-2 px-1.5 rounded-lg flex items-center justify-center gap-1 transition-colors shadow-md active:scale-95 cursor-pointer"
             >
               {addedAnimation ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <Check className="w-3 h-3 text-emerald-400" />
                   <span>Added!</span>
                 </>
               ) : (
                 <>
-                  <ShoppingBag className="w-3.5 h-3.5" />
+                  <ShoppingBag className="w-3 h-3" />
                   <span>Add to Bag</span>
                 </>
               )}
@@ -174,23 +174,23 @@ export default function ProductCard({ product }) {
           </div>
 
           {/* Mobile Quick Add Pill Button */}
-          <div className="absolute right-2 bottom-2 z-20 sm:hidden">
+          <div className="absolute right-1.5 bottom-1.5 z-20 sm:hidden">
             <button
               onClick={handleQuickAdd}
               aria-label="Quick Add to Bag"
-              className="w-8 h-8 rounded-full bg-[#3E0C15] text-[#F7EFCF] flex items-center justify-center shadow-lg active:scale-90"
+              className="w-7 h-7 rounded-full bg-[#3E0C15] text-[#F7EFCF] flex items-center justify-center shadow-md active:scale-90"
             >
-              <ShoppingBag className="w-3.5 h-3.5" />
+              <ShoppingBag className="w-3 h-3" />
             </button>
           </div>
         </div>
 
-        {/* Product Information Details */}
-        <div className="p-3.5 sm:p-4 flex flex-col flex-1 justify-between bg-white">
+        {/* Product Information Details - Sleek & compact */}
+        <div className="p-2.5 sm:p-3 flex flex-col flex-1 justify-between bg-white">
           <div>
             {/* Category & Color / Variant Indicators */}
-            <div className="flex items-center justify-between gap-1.5 mb-1.5">
-              <span className="text-[10px] sm:text-[11px] uppercase tracking-wider text-[#9E7D2E] font-semibold">
+            <div className="flex items-center justify-between gap-1 mb-1">
+              <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-[#9E7D2E] font-semibold truncate max-w-[70%]">
                 {product.categoryName || product.category}
               </span>
 
@@ -204,9 +204,9 @@ export default function ProductCard({ product }) {
                     key={i}
                     onClick={() => setSelectedColor(v.name)}
                     title={v.name}
-                    className={`w-3 h-3 rounded-full transition-all cursor-pointer ${
+                    className={`w-2.5 h-2.5 rounded-full transition-all cursor-pointer ${
                       selectedColor === v.name
-                        ? "ring-2 ring-[#9E7D2E] ring-offset-1 scale-110"
+                        ? "ring-1.5 ring-[#9E7D2E] ring-offset-1 scale-110"
                         : "opacity-75 hover:opacity-100 hover:scale-105"
                     }`}
                     style={{ backgroundColor: v.hex }}
@@ -217,41 +217,41 @@ export default function ProductCard({ product }) {
 
             {/* Product Name (Clickable link) */}
             <Link href={`/product/${product.slug}`} className="block">
-              <h3 className="font-serif-luxury text-sm sm:text-base font-medium text-stone-900 line-clamp-2 hover:text-[#571520] transition-colors leading-snug">
+              <h3 className="font-serif-luxury text-xs sm:text-[13px] font-medium text-stone-900 line-clamp-1 sm:line-clamp-2 hover:text-[#571520] transition-colors leading-tight sm:leading-snug">
                 {product.name}
               </h3>
             </Link>
 
             {/* Fabric Subtitle */}
-            <p className="text-[11px] text-stone-500 mt-0.5 line-clamp-1">
+            <p className="text-[10px] sm:text-[11px] text-stone-500 mt-0.5 line-clamp-1">
               {product.fabricName || product.fabric}
             </p>
 
             {/* Rating & Review Count */}
-            <div className="flex items-center gap-1.5 mt-1.5">
-              <div className="flex items-center gap-0.5 text-amber-500">
-                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+            <div className="flex items-center gap-1 mt-1">
+              <div className="flex items-center text-amber-500">
+                <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-amber-400 text-amber-400" />
               </div>
-              <span className="text-[11px] font-bold text-stone-800">{product.rating}</span>
-              <span className="text-[11px] text-stone-400">({product.reviewsCount})</span>
+              <span className="text-[10px] sm:text-[11px] font-bold text-stone-800">{product.rating || "4.8"}</span>
+              <span className="text-[10px] sm:text-[11px] text-stone-400">({product.reviewsCount || 0})</span>
             </div>
           </div>
 
           {/* Pricing Row (Selling Price, MRP, Discount %) */}
-          <div className="flex items-baseline justify-between mt-3 pt-2.5 border-t border-stone-100">
-            <div className="flex items-baseline flex-wrap gap-1.5">
-              <span className="text-sm sm:text-base font-bold text-[#3E0C15]">
+          <div className="flex items-baseline justify-between mt-2 pt-1.5 border-t border-stone-100">
+            <div className="flex items-baseline flex-wrap gap-1">
+              <span className="text-xs sm:text-sm md:text-base font-bold text-[#3E0C15]">
                 ₹{product.price.toLocaleString("en-IN")}
               </span>
 
               {product.originalPrice && product.originalPrice > product.price && (
-                <span className="text-[11px] text-stone-400 line-through">
+                <span className="text-[10px] sm:text-[11px] text-stone-400 line-through">
                   ₹{product.originalPrice.toLocaleString("en-IN")}
                 </span>
               )}
 
               {discountPercent > 0 && (
-                <span className="text-[10px] font-bold text-emerald-700">
+                <span className="text-[9px] sm:text-[10px] font-bold text-emerald-700">
                   ({discountPercent}% OFF)
                 </span>
               )}

@@ -3,7 +3,7 @@
 import { use, useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, useRouter } from "next/navigation";
 import { 
   Heart, 
   ShoppingBag, 
@@ -29,7 +29,7 @@ import {
   Lock,
   MessageSquare,
   ThumbsUp,
-  MapPin,
+  Globe,
   X,
   Copy,
   Maximize2
@@ -44,6 +44,7 @@ import { db } from "@/lib/firebase";
 export default function ProductDetailPage({ params }) {
   const unwrappedParams = use(params);
   const { slug } = unwrappedParams;
+  const router = useRouter();
 
   const [product, setProduct] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
@@ -92,9 +93,6 @@ export default function ProductDetailPage({ params }) {
   const [activeColor, setActiveColor] = useState(product?.colorName || "Primary");
   const [addedToast, setAddedToast] = useState(false);
 
-  // Delivery Pincode Checker
-  const [pincode, setPincode] = useState("");
-  const [pincodeStatus, setPincodeStatus] = useState(null); // null | "checking" | "success" | "invalid"
 
   // Bottom Tabs
   const [activeTab, setActiveTab] = useState("description"); // "description" | "details" | "delivery" | "returns" | "reviews"
@@ -195,17 +193,7 @@ export default function ProductDetailPage({ params }) {
     }
   };
 
-  const handleCheckPincode = (e) => {
-    e.preventDefault();
-    if (!pincode || pincode.trim().length !== 6 || isNaN(pincode)) {
-      setPincodeStatus("invalid");
-      return;
-    }
-    setPincodeStatus("checking");
-    setTimeout(() => {
-      setPincodeStatus("success");
-    }, 400);
-  };
+
 
   const handleAddReview = (e) => {
     e.preventDefault();
@@ -233,6 +221,12 @@ export default function ProductDetailPage({ params }) {
     addToCart(product, quantity, blouseOption);
     setAddedToast(true);
     setTimeout(() => setAddedToast(false), 2000);
+  };
+
+  const handleBuyNow = (e) => {
+    e?.preventDefault();
+    addToCart(product, quantity, blouseOption);
+    router.push("/checkout");
   };
 
   // Color variants for demo
@@ -612,59 +606,37 @@ export default function ProductDetailPage({ params }) {
                 </div>
 
                 {/* Direct Buy Now Button */}
-                <Link
-                  href="/checkout"
-                  onClick={() => addToCart(product, quantity, blouseOption)}
+                <button
+                  type="button"
+                  onClick={handleBuyNow}
                   id="pdp-buy-now"
                   className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-500 text-stone-950 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-95 text-center cursor-pointer"
                 >
                   <Sparkles className="w-4 h-4 shrink-0" />
                   <span>Buy Now • Instant Express Checkout</span>
-                </Link>
+                </button>
               </div>
 
-              {/* Pincode Delivery Estimate Checker */}
+              {/* Worldwide & Pan-India Delivery Assurance */}
               <div className="pt-4 border-t border-stone-200">
-                <form onSubmit={handleCheckPincode} className="space-y-2">
-                  <label className="text-xs font-bold text-stone-900 uppercase tracking-wider block">
-                    Check Delivery & Availability:
-                  </label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <MapPin className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        maxLength={6}
-                        value={pincode}
-                        onChange={(e) => {
-                          setPincode(e.target.value);
-                          setPincodeStatus(null);
-                        }}
-                        placeholder="Enter 6-digit Pincode..."
-                        className="w-full bg-white border border-stone-300 rounded-xl pl-9 pr-4 py-2.5 text-xs text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-[#3E0C15]"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      className="px-4 sm:px-5 py-2.5 rounded-xl bg-stone-900 hover:bg-[#3E0C15] text-white text-xs font-bold transition-all shrink-0 cursor-pointer"
-                    >
-                      Check
-                    </button>
+                <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-amber-50/80 via-stone-50 to-amber-50/40 border border-amber-200/60 shadow-2xs">
+                  <div className="w-9 h-9 rounded-full bg-amber-100/80 flex items-center justify-center shrink-0 text-[#3E0C15]">
+                    <Globe className="w-4 h-4" />
                   </div>
-
-                  {pincodeStatus === "success" && (
-                    <div className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 flex items-center gap-2 animate-in fade-in">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>Delivery by <strong>Thursday, 3 Business Days</strong>. Free Express Insured Shipping.</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-stone-900 text-xs sm:text-[13px]">
+                        Worldwide &amp; Pan-India Express Delivery
+                      </span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                        100% Locations Active
+                      </span>
                     </div>
-                  )}
-
-                  {pincodeStatus === "invalid" && (
-                    <div className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-2.5 animate-in fade-in">
-                      Please enter a valid 6-digit Indian delivery pincode.
-                    </div>
-                  )}
-                </form>
+                    <p className="text-stone-600 text-[11px] mt-0.5 leading-snug">
+                      Delivery available to every corner of India &amp; all international countries with live tracking.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* 4 Trust Badges */}
@@ -702,10 +674,11 @@ export default function ProductDetailPage({ params }) {
                 { id: "details", label: "Fabric & Details" },
                 { id: "delivery", label: "Delivery & Shipping" },
                 { id: "returns", label: "Returns & Exchange" },
-                { id: "reviews", label: `Reviews (${reviewsList.length})` },
+                { id: "reviews", label: `Reviews (${reviewsList?.length || 3})` },
               ].map((tab) => (
                 <button
                   key={tab.id}
+                  type="button"
                   onClick={() => setActiveTab(tab.id)}
                   className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
                     activeTab === tab.id
@@ -718,23 +691,56 @@ export default function ProductDetailPage({ params }) {
               ))}
             </div>
 
-            {/* Tab Contents */}
-            <div className="mt-6 sm:mt-8 max-w-4xl mx-auto bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-10 border border-amber-900/10 shadow-sm">
+            {/* Tab Contents Container */}
+            <div className="mt-6 sm:mt-8 max-w-4xl mx-auto bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-10 border border-amber-900/10 shadow-sm min-h-[320px]">
               
               {/* Tab 1: Description */}
               {activeTab === "description" && (
                 <div className="space-y-4 animate-in fade-in duration-200 text-stone-700 leading-relaxed text-xs sm:text-sm">
-                  <h3 className="font-serif-luxury text-xl sm:text-2xl text-[#3E0C15] font-semibold">
-                    The Artisan Drape Chronicle
-                  </h3>
-                  <p>{product.description}</p>
-                  <p>
+                  <div className="flex items-center justify-between gap-3 border-b border-stone-100 pb-3">
+                    <h3 className="font-serif-luxury text-xl sm:text-2xl text-[#3E0C15] font-semibold">
+                      The Artisan Drape Chronicle
+                    </h3>
+                    <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200/80 px-2.5 py-1 rounded-full shrink-0">
+                      Product Overview
+                    </span>
+                  </div>
+
+                  {/* Admin description from Firestore */}
+                  {product?.description ? (
+                    <div className="text-stone-800 text-xs sm:text-sm leading-relaxed whitespace-pre-line font-medium bg-stone-50/80 p-4 rounded-xl border border-stone-200/60 shadow-2xs">
+                      {product.description}
+                    </div>
+                  ) : null}
+
+                  <p className="text-stone-600">
                     Every thread tells the story of generations of master weavers who have preserved the ancient craft of Indian handlooms. Each warp and weft is tensioned manually to achieve a supple drape that flatters the silhouette while honouring royal traditions.
                   </p>
-                  <div className="bg-[#FAF7F2] p-3.5 sm:p-4 rounded-2xl border border-amber-900/10 mt-4 flex items-center gap-3">
+
+                  {/* Highlights Summary Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
+                    <div className="bg-[#FAF7F2] p-2.5 rounded-xl border border-amber-900/10 text-center">
+                      <span className="text-[10px] uppercase tracking-wider text-stone-400 block font-semibold">Craft &amp; Weave</span>
+                      <span className="text-xs font-bold text-stone-900 block mt-0.5">{product?.categoryName || product?.category || "Handloom Silks"}</span>
+                    </div>
+                    <div className="bg-[#FAF7F2] p-2.5 rounded-xl border border-amber-900/10 text-center">
+                      <span className="text-[10px] uppercase tracking-wider text-stone-400 block font-semibold">Base Fabric</span>
+                      <span className="text-xs font-bold text-stone-900 block mt-0.5">{product?.fabricName || product?.fabric || "Pure Mulberry Silk"}</span>
+                    </div>
+                    <div className="bg-[#FAF7F2] p-2.5 rounded-xl border border-amber-900/10 text-center">
+                      <span className="text-[10px] uppercase tracking-wider text-stone-400 block font-semibold">Color Shade</span>
+                      <span className="text-xs font-bold text-stone-900 block mt-0.5">{product?.colorName || product?.color || "Royal Hue"}</span>
+                    </div>
+                    <div className="bg-[#FAF7F2] p-2.5 rounded-xl border border-amber-900/10 text-center">
+                      <span className="text-[10px] uppercase tracking-wider text-stone-400 block font-semibold">Assurance</span>
+                      <span className="text-xs font-bold text-emerald-800 block mt-0.5">Silk Mark Certified</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-amber-50/60 p-3.5 sm:p-4 rounded-2xl border border-amber-900/10 mt-3 flex items-center gap-3">
                     <Sparkles className="w-5 h-5 text-amber-700 shrink-0" />
                     <span className="text-xs text-stone-700 italic">
-                      "An heirloom piece designed not merely for a season, but to be passed down through generations with reverence."
+                      &ldquo;An heirloom piece designed not merely for a season, but to be passed down through generations with reverence.&rdquo;
                     </span>
                   </div>
                 </div>
@@ -743,38 +749,66 @@ export default function ProductDetailPage({ params }) {
               {/* Tab 2: Fabric & Details */}
               {activeTab === "details" && (
                 <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-200">
-                  <h3 className="font-serif-luxury text-xl sm:text-2xl text-[#3E0C15] font-semibold">
-                    Fabric & Craftsmanship Specifications
-                  </h3>
+                  <div className="flex items-center justify-between gap-3 border-b border-stone-100 pb-3">
+                    <h3 className="font-serif-luxury text-xl sm:text-2xl text-[#3E0C15] font-semibold">
+                      Fabric &amp; Craftsmanship Specifications
+                    </h3>
+                    <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full shrink-0">
+                      Handloom Certified
+                    </span>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm">
-                    <div className="p-3 sm:p-3.5 rounded-xl bg-stone-50 border border-stone-200">
-                      <span className="text-stone-400 block text-[10px] sm:text-[11px] uppercase tracking-wider">Base Fabric</span>
-                      <span className="font-bold text-stone-900 mt-0.5 block">{product.fabricName}</span>
+                    <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+                      <span className="text-stone-400 block text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold">Base Fabric</span>
+                      <span className="font-bold text-stone-900 mt-1 block text-xs sm:text-sm">
+                        {product?.fabricName || product?.fabric || "Pure Mulberry Silk"}
+                      </span>
+                      <span className="text-[11px] text-stone-500 mt-0.5 block">100% natural breathable pure handloom yarn</span>
                     </div>
-                    <div className="p-3 sm:p-3.5 rounded-xl bg-stone-50 border border-stone-200">
-                      <span className="text-stone-400 block text-[10px] sm:text-[11px] uppercase tracking-wider">Weave Technique</span>
-                      <span className="font-bold text-stone-900 mt-0.5 block">{product.details.weave}</span>
+                    <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+                      <span className="text-stone-400 block text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold">Weave Technique</span>
+                      <span className="font-bold text-stone-900 mt-1 block text-xs sm:text-sm">
+                        {product?.details?.weave || product?.weave || "Authentic Handloom Kadwa / Jacquard Banarasi Weave"}
+                      </span>
+                      <span className="text-[11px] text-stone-500 mt-0.5 block">Traditional hand-interlocked artisan motifs</span>
                     </div>
-                    <div className="p-3 sm:p-3.5 rounded-xl bg-stone-50 border border-stone-200">
-                      <span className="text-stone-400 block text-[10px] sm:text-[11px] uppercase tracking-wider">Zari Material</span>
-                      <span className="font-bold text-stone-900 mt-0.5 block">{product.details.zari}</span>
+                    <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+                      <span className="text-stone-400 block text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold">Zari Material</span>
+                      <span className="font-bold text-stone-900 mt-1 block text-xs sm:text-sm">
+                        {product?.details?.zari || product?.zari || "Tested Gold & Silver Metallic Zari"}
+                      </span>
+                      <span className="text-[11px] text-stone-500 mt-0.5 block">Tarnish-resistant antique lustre finish</span>
                     </div>
-                    <div className="p-3 sm:p-3.5 rounded-xl bg-stone-50 border border-stone-200">
-                      <span className="text-stone-400 block text-[10px] sm:text-[11px] uppercase tracking-wider">Blouse Piece</span>
-                      <span className="font-bold text-stone-900 mt-0.5 block">{product.details.blousePiece}</span>
+                    <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+                      <span className="text-stone-400 block text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold">Blouse Piece</span>
+                      <span className="font-bold text-stone-900 mt-1 block text-xs sm:text-sm">
+                        {product?.details?.blousePiece || product?.blousePiece || "Included (0.8m Matching Unstitched Fabric)"}
+                      </span>
+                      <span className="text-[11px] text-stone-500 mt-0.5 block">Features coordinating border embroidery</span>
                     </div>
-                    <div className="p-3 sm:p-3.5 rounded-xl bg-stone-50 border border-stone-200">
-                      <span className="text-stone-400 block text-[10px] sm:text-[11px] uppercase tracking-wider">Dimensions & Length</span>
-                      <span className="font-bold text-stone-900 mt-0.5 block">{product.details.length}</span>
+                    <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+                      <span className="text-stone-400 block text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold">Dimensions &amp; Length</span>
+                      <span className="font-bold text-stone-900 mt-1 block text-xs sm:text-sm">
+                        {product?.details?.length || product?.length || "5.5 Metres Saree + 0.8 Metre Blouse (Standard 6.3m Total)"}
+                      </span>
+                      <span className="text-[11px] text-stone-500 mt-0.5 block">Width: 46 inches with lavish pallu drape</span>
                     </div>
-                    <div className="p-3 sm:p-3.5 rounded-xl bg-stone-50 border border-stone-200">
-                      <span className="text-stone-400 block text-[10px] sm:text-[11px] uppercase tracking-wider">Care Instructions</span>
-                      <span className="font-bold text-stone-900 mt-0.5 block">{product.details.care}</span>
+                    <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+                      <span className="text-stone-400 block text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold">Care Instructions</span>
+                      <span className="font-bold text-stone-900 mt-1 block text-xs sm:text-sm">
+                        {product?.details?.care || product?.care || "Dry Clean Recommended. Preserve in pure cotton muslin."}
+                      </span>
+                      <span className="text-[11px] text-stone-500 mt-0.5 block">Avoid direct perfume spraying on zari</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-xl text-xs text-amber-900 border border-amber-200">
-                    <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0" />
-                    <span>Certified with <strong>Silk Mark India</strong> authentic pure silk label attached with tamper-proof QR code.</span>
+
+                  <div className="flex items-center gap-3 p-3.5 bg-amber-50 rounded-xl text-xs text-amber-900 border border-amber-200">
+                    <ShieldCheck className="w-5 h-5 text-amber-700 shrink-0" />
+                    <div>
+                      <strong className="block text-stone-900">Silk Mark Certified Authenticity</strong>
+                      <span>All our pure silks carry the official Silk Mark India label with verifiable security hologram tag.</span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -782,29 +816,42 @@ export default function ProductDetailPage({ params }) {
               {/* Tab 3: Delivery */}
               {activeTab === "delivery" && (
                 <div className="space-y-4 animate-in fade-in duration-200 text-xs sm:text-sm text-stone-700 leading-relaxed">
-                  <h3 className="font-serif-luxury text-xl sm:text-2xl text-[#3E0C15] font-semibold">
-                    Worldwide Delivery & Logistics
-                  </h3>
+                  <div className="flex items-center justify-between gap-3 border-b border-stone-100 pb-3">
+                    <h3 className="font-serif-luxury text-xl sm:text-2xl text-[#3E0C15] font-semibold">
+                      Worldwide &amp; Pan-India Delivery
+                    </h3>
+                    <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full shrink-0">
+                      100% Locations Active
+                    </span>
+                  </div>
+
                   <div className="space-y-3">
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-3 p-3.5 rounded-xl bg-stone-50 border border-stone-200">
                       <Truck className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
                       <div>
-                        <strong className="text-stone-900 block">Domestic Express Air Shipping (India)</strong>
-                        <span>Dispatched within 24 hours. Delivered across major Indian metros in 2 to 4 business days. Free shipping on all orders.</span>
+                        <strong className="text-stone-900 block font-bold">Domestic Express Air Shipping (All India)</strong>
+                        <span className="text-stone-600">Dispatched within 24 hours. Delivered across every city, town, and rural pincode in India in 2 to 4 business days. Free express insured shipping on all orders. Cash on Delivery (COD) available.</span>
                       </div>
                     </div>
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-3 p-3.5 rounded-xl bg-stone-50 border border-stone-200">
+                      <Globe className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="text-stone-900 block font-bold">International Priority Delivery (Worldwide 150+ Countries)</strong>
+                        <span className="text-stone-600">We ship worldwide to USA, UK, Canada, UAE, Australia, Singapore, Europe, and 150+ countries via DHL Express &amp; FedEx Priority. Tracked door-to-door delivery in 4 to 7 business days.</span>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-3.5 rounded-xl bg-stone-50 border border-stone-200">
                       <ShieldCheck className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
                       <div>
-                        <strong className="text-stone-900 block">100% Insured Luxury Transit</strong>
-                        <span>All packages are sealed in tamper-evident velvet-lined heirloom boxes with signature-required doorstep delivery.</span>
+                        <strong className="text-stone-900 block font-bold">100% Insured Luxury Transit Packaging</strong>
+                        <span className="text-stone-600">Every master-drape is packed in a signature velvet-lined heirloom box with moisture-proof protective wrapping and tamper-evident sealing.</span>
                       </div>
                     </div>
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-3 p-3.5 rounded-xl bg-stone-50 border border-stone-200">
                       <Clock className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
                       <div>
-                        <strong className="text-stone-900 block">Custom Tailored Delivery Timelines</strong>
-                        <span>Orders with custom blouse stitching require an additional 3 business days for our master drapers to craft your bespoke measurements.</span>
+                        <strong className="text-stone-900 block font-bold">Live Tracking &amp; Custom Stitching Timelines</strong>
+                        <span className="text-stone-600">Live SMS &amp; WhatsApp tracking links are dispatched immediately upon shipment. For orders with custom blouse tailoring, add 3 additional working days.</span>
                       </div>
                     </div>
                   </div>
@@ -814,16 +861,38 @@ export default function ProductDetailPage({ params }) {
               {/* Tab 4: Returns */}
               {activeTab === "returns" && (
                 <div className="space-y-4 animate-in fade-in duration-200 text-xs sm:text-sm text-stone-700 leading-relaxed">
-                  <h3 className="font-serif-luxury text-xl sm:text-2xl text-[#3E0C15] font-semibold">
-                    7-Day Complimentary Exchange & Return Policy
-                  </h3>
-                  <p>
-                    We want you to be completely captivated by your heirloom drape. If for any reason the saree does not meet your expectations, we offer a seamless 7-day doorstep return or exchange service.
+                  <div className="flex items-center justify-between gap-3 border-b border-stone-100 pb-3">
+                    <h3 className="font-serif-luxury text-xl sm:text-2xl text-[#3E0C15] font-semibold">
+                      7-Day Complimentary Exchange &amp; Return Policy
+                    </h3>
+                    <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full shrink-0">
+                      Hassle-Free Guarantee
+                    </span>
+                  </div>
+
+                  <p className="text-stone-600">
+                    We want you to be completely captivated by your heirloom drape. If for any reason the saree does not meet your expectations, we offer a seamless 7-day doorstep return or exchange service with 100% money back.
                   </p>
-                  <ul className="list-disc pl-5 space-y-1.5 text-stone-600 text-xs sm:text-sm">
-                    <li>The saree must remain unused, unwashed, and with original tags and Silk Mark hologram intact.</li>
-                    <li>Complimentary reverse pickup arranged from your doorstep.</li>
-                    <li>Full refund processed to your original payment method within 48 hours of quality inspection.</li>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                    <div className="p-3 rounded-xl bg-stone-50 border border-stone-200">
+                      <strong className="text-stone-900 block text-xs font-bold mb-1">1. Easy Request</strong>
+                      <span className="text-[11px] text-stone-600">Initiate return or exchange online via account or WhatsApp within 7 days of delivery.</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-stone-50 border border-stone-200">
+                      <strong className="text-stone-900 block text-xs font-bold mb-1">2. Doorstep Pickup</strong>
+                      <span className="text-[11px] text-stone-600">Complimentary courier pickup arranged from your doorstep anywhere in India.</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-stone-50 border border-stone-200">
+                      <strong className="text-stone-900 block text-xs font-bold mb-1">3. Instant Refund</strong>
+                      <span className="text-[11px] text-stone-600">Full refund processed to original payment method or bank account within 24-48 hours.</span>
+                    </div>
+                  </div>
+
+                  <ul className="list-disc pl-5 space-y-1 text-stone-500 text-[11px] sm:text-xs pt-1">
+                    <li>Saree must remain unused, unwashed, and with original tags and Silk Mark hologram intact.</li>
+                    <li>Fall &amp; pico finished sarees are 100% eligible for standard returns.</li>
+                    <li>For international orders, our dedicated concierge team assists with reverse logistics.</li>
                   </ul>
                 </div>
               )}
@@ -834,7 +903,7 @@ export default function ProductDetailPage({ params }) {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-stone-200">
                     <div>
                       <h3 className="font-serif-luxury text-xl sm:text-2xl text-[#3E0C15] font-semibold">
-                        Customer Appraisals & Chronicles
+                        Customer Appraisals &amp; Chronicles
                       </h3>
                       <div className="flex items-center gap-2 mt-1">
                         <div className="flex items-center text-amber-500">
@@ -842,12 +911,13 @@ export default function ProductDetailPage({ params }) {
                             <Star key={i} className="w-3.5 h-3.5 fill-amber-400" />
                           ))}
                         </div>
-                        <span className="text-xs sm:text-sm font-bold text-stone-900">{product.rating} out of 5</span>
-                        <span className="text-xs text-stone-400">({reviewsList.length} global appraisals)</span>
+                        <span className="text-xs sm:text-sm font-bold text-stone-900">{product?.rating || 5} out of 5</span>
+                        <span className="text-xs text-stone-400">({reviewsList?.length || 3} global appraisals)</span>
                       </div>
                     </div>
 
                     <button
+                      type="button"
                       onClick={() => setShowReviewForm(!showReviewForm)}
                       className="px-5 py-2 rounded-full bg-[#3E0C15] text-[#F7EFCF] text-xs font-bold hover:bg-[#571520] transition-all shadow cursor-pointer self-start sm:self-auto"
                     >
@@ -927,7 +997,7 @@ export default function ProductDetailPage({ params }) {
                         </div>
 
                         <div className="flex items-center text-amber-500">
-                          {[...Array(rev.rating)].map((_, i) => (
+                          {[...Array(rev.rating || 5)].map((_, i) => (
                             <Star key={i} className="w-3 h-3 fill-amber-400" />
                           ))}
                         </div>
@@ -985,14 +1055,14 @@ export default function ProductDetailPage({ params }) {
             <span>{addedToast ? "Added ✓" : "Bag"}</span>
           </button>
 
-          <Link
-            href="/checkout"
-            onClick={() => addToCart(product, quantity, blouseOption)}
-            className="flex-1 py-2.5 px-2 bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] rounded-xl text-xs font-bold flex items-center justify-center gap-1 active:scale-95 transition-all text-center shadow"
+          <button
+            type="button"
+            onClick={handleBuyNow}
+            className="flex-1 py-2.5 px-2 bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] rounded-xl text-xs font-bold flex items-center justify-center gap-1 active:scale-95 transition-all text-center shadow cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             <span>Buy Now</span>
-          </Link>
+          </button>
         </div>
       </div>
 

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, Suspense, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Search, Sparkles, X, ChevronDown } from "lucide-react";
+import { Search, Sparkles, X, ChevronDown, RotateCcw } from "lucide-react";
 import ProductCard from "@/components/ProductCard";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -152,8 +152,24 @@ function SearchContent() {
           <strong className="text-stone-950 font-bold">{results.length} Sarees</strong>
         </span>
 
-        {/* Sort Dropdown */}
-        <div className="flex items-center gap-2">
+        {/* Sort Dropdown & Clear All */}
+        <div className="flex items-center gap-2.5">
+          {(query || sortBy !== "featured") && (
+            <button
+              type="button"
+              id="search-clear-all-btn"
+              onClick={() => {
+                handleQueryChange("");
+                setSortBy("featured");
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all cursor-pointer shadow-xs active:scale-95"
+              title="Reset search and sort filters"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Clear All</span>
+            </button>
+          )}
+
           <span className="text-xs text-stone-500 font-medium hidden sm:inline">Sort By:</span>
           <div className="relative">
             <select
@@ -174,9 +190,9 @@ function SearchContent() {
         </div>
       </div>
 
-      {/* Results Grid: Desktop 4 products/row, Mobile 2 products/row */}
+      {/* Results Grid: Desktop 4-5 products/row, Mobile 2 products/row */}
       {results.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-4 md:gap-5">
           {results.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
@@ -193,10 +209,15 @@ function SearchContent() {
             Try searching with popular terms like &ldquo;Silk Saree&rdquo;, &ldquo;Banarasi&rdquo;, &ldquo;Wedding Saree&rdquo;, or &ldquo;Organza&rdquo;.
           </p>
           <button
-            onClick={() => handleQueryChange("")}
-            className="mt-6 px-8 py-3 rounded-full bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] text-xs font-semibold transition-all shadow cursor-pointer"
+            id="empty-search-clear-btn"
+            onClick={() => {
+              handleQueryChange("");
+              setSortBy("featured");
+            }}
+            className="mt-6 px-8 py-3 rounded-full bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] text-xs font-semibold transition-all shadow cursor-pointer inline-flex items-center gap-2 active:scale-95"
           >
-            Clear Search
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Clear Search &amp; Filters</span>
           </button>
         </div>
       )}

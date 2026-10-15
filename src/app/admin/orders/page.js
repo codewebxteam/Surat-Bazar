@@ -43,6 +43,7 @@ export default function AdminOrdersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [printWarning, setPrintWarning] = useState(false);
 
   const filteredOrders = orders.filter((o) => {
     const matchesSearch = o.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -125,6 +126,19 @@ export default function AdminOrdersPage() {
               {st === "all" ? "All Orders" : st}
             </button>
           ))}
+
+          {(searchQuery.trim() !== "" || statusFilter !== "all") && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                setStatusFilter("all");
+              }}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 whitespace-nowrap transition-all cursor-pointer shadow-xs active:scale-95"
+            >
+              Clear All
+            </button>
+          )}
         </div>
       </div>
 
@@ -263,26 +277,59 @@ export default function AdminOrdersPage() {
               <div className="pt-2 border-t border-stone-100 flex justify-between items-center">
                 <div>
                   <p className="font-bold text-stone-700">Payment Status</p>
-                  <p className="text-stone-500">{selectedOrder.paymentMethod}</p>
+                  <p className="text-stone-600 font-medium">{selectedOrder.paymentMethod}</p>
+                  {selectedOrder.razorpayPaymentId && (
+                    <p className="text-[10px] text-emerald-800 font-mono mt-0.5 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 w-fit">
+                      Rzp ID: {selectedOrder.razorpayPaymentId}
+                    </p>
+                  )}
                 </div>
                 <div className="text-right">
                   <p className="font-bold text-stone-700">Grand Total</p>
-                  <p className="text-base font-bold text-[#571520]">₹{selectedOrder.totalAmount.toLocaleString("en-IN")}</p>
+                  <p className="text-base font-bold text-[#571520]">₹{selectedOrder.totalAmount?.toLocaleString("en-IN") || 0}</p>
                 </div>
               </div>
             </div>
 
+            {/* Invoice Print Warning if not delivered */}
+            {printWarning && (
+              <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex items-start gap-2.5 animate-in fade-in">
+                <AlertCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <span className="font-bold block">Tax Invoice Restricted:</span>
+                  <p className="text-[11px] leading-relaxed text-amber-800">
+                    Official Tax Invoices can only be printed or downloaded after the order has been delivered to the patron. Current status is <strong className="uppercase underline">{selectedOrder.status}</strong>. Please update the order status to &quot;Delivered&quot; before printing the invoice.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="pt-4 border-t border-stone-100 flex gap-2">
               <button
-                onClick={() => window.print()}
-                className="flex-1 py-2.5 rounded-xl border border-stone-300 hover:bg-stone-50 font-semibold text-xs text-stone-800 flex items-center justify-center gap-1.5"
+                onClick={() => {
+                  if (selectedOrder.status?.toLowerCase() !== "delivered") {
+                    setPrintWarning(true);
+                  } else {
+                    setPrintWarning(false);
+                    window.print();
+                  }
+                }}
+                className={`flex-1 py-2.5 rounded-xl border font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                  selectedOrder.status?.toLowerCase() === "delivered"
+                    ? "border-stone-300 hover:bg-stone-50 text-stone-800"
+                    : "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                }`}
+                title={selectedOrder.status?.toLowerCase() === "delivered" ? "Print invoice" : "Invoice requires Delivered status"}
               >
                 <FileText className="w-4 h-4" />
-                <span>Print Invoice</span>
+                <span>{selectedOrder.status?.toLowerCase() === "delivered" ? "Print Invoice" : "Invoice (Delivery Pending)"}</span>
               </button>
               <button
-                onClick={() => setSelectedOrder(null)}
-                className="flex-1 py-2.5 rounded-xl bg-[#571520] hover:bg-[#3A0D15] text-[#F3E5C8] font-semibold text-xs"
+                onClick={() => {
+                  setSelectedOrder(null);
+                  setPrintWarning(false);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-[#571520] hover:bg-[#3A0D15] text-[#F3E5C8] font-semibold text-xs cursor-pointer"
               >
                 Done
               </button>

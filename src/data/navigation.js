@@ -100,7 +100,7 @@ export const MOBILE_BOTTOM_NAV_ITEMS = [
   { id: "account", label: "Account", href: "/account", icon: "User" },
 ];
 
-// Footer 5 Columns Data Structure
+// Footer 4 Columns Data Structure (Dedicated, Active Pages Only)
 export const FOOTER_COLUMNS = [
   {
     id: "shop",
@@ -109,8 +109,6 @@ export const FOOTER_COLUMNS = [
       { label: "Sarees", href: "/collections/sarees" },
       { label: "New Arrivals", href: "/new-arrivals" },
       { label: "Bestsellers", href: "/bestsellers" },
-      { label: "Wedding Sarees", href: "/collections/occasion/wedding" },
-      { label: "Festive Sarees", href: "/collections/occasion/festive" },
       { label: "Sale", href: "/sale" },
     ],
   },
@@ -119,42 +117,27 @@ export const FOOTER_COLUMNS = [
     title: "CUSTOMER CARE",
     links: [
       { label: "Contact Us", href: "/pages/contact-us" },
-      { label: "Shipping & Delivery", href: "/pages/shipping-policy" },
       { label: "Track Order", href: "/track" },
-      { label: "Returns & Exchange", href: "/pages/return-policy" },
+      { label: "Shipping Policy", href: "/pages/shipping-policy" },
+      { label: "Refund & Return Policy", href: "/refund-policy" },
       { label: "FAQs", href: "/pages/faq" },
     ],
   },
   {
-    id: "about",
-    title: "ABOUT",
+    id: "legal",
+    title: "ABOUT & LEGAL",
     links: [
       { label: "About Us", href: "/pages/about-us" },
-      { label: "Our Story", href: "/pages/about-us" },
-      { label: "Our Stores", href: "/pages/stores" },
-      { label: "Contact Concierge", href: "/pages/contact-us" },
-    ],
-  },
-  {
-    id: "information",
-    title: "INFORMATION",
-    links: [
-      { label: "Privacy Policy", href: "/pages/privacy-policy" },
-      { label: "Terms & Conditions", href: "/pages/terms-conditions" },
-      { label: "Refund Policy", href: "/pages/return-policy" },
-      { label: "Shipping Policy", href: "/pages/shipping-policy" },
-      { label: "Care Guide", href: "/pages/care-guide" },
-      { label: "Size Guide", href: "/pages/size-guide" },
+      { label: "Privacy Policy", href: "/privacy-policy" },
+      { label: "Terms & Conditions", href: "/terms-and-conditions" },
     ],
   },
   {
     id: "social",
-    title: "SOCIAL",
+    title: "FOLLOW US",
     links: [
-      { label: "Instagram", href: "https://instagram.com", isExternal: true },
-      { label: "Facebook", href: "https://facebook.com", isExternal: true },
-      { label: "Pinterest", href: "https://pinterest.com", isExternal: true },
-      { label: "YouTube", href: "https://youtube.com", isExternal: true },
+      { label: "Instagram", href: "https://instagram.com/suratbazar_official", isExternal: true },
+      { label: "Facebook", href: "https://facebook.com/suratbazar_official", isExternal: true },
     ],
   },
 ];

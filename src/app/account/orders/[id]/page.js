@@ -20,7 +20,10 @@ import {
   Phone,
   User,
   AlertCircle,
-  Loader2
+  Loader2,
+  Lock,
+  X,
+  FileText
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -53,6 +56,7 @@ export default function OrderDetailPage() {
 
   const [loading, setLoading] = useState(() => !order);
   const [error, setError] = useState(null);
+  const [showInvoiceWarning, setShowInvoiceWarning] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -223,6 +227,14 @@ export default function OrderDetailPage() {
   const isDelivered = status.toLowerCase() === "delivered";
   const isDispatched = status.toLowerCase() === "dispatched" || status.toLowerCase() === "in transit";
 
+  const handlePrintInvoice = () => {
+    if (!isDelivered) {
+      setShowInvoiceWarning(true);
+      return;
+    }
+    window.print();
+  };
+
   // Address fields
   const recipientName = order.shippingDetails?.name || order.customer || "Patron";
   const recipientMobile = order.shippingDetails?.mobile || order.phone || "";
@@ -290,11 +302,25 @@ export default function OrderDetailPage() {
 
               <div className="flex items-center gap-2.5 print:hidden">
                 <button 
-                  onClick={() => window.print()}
-                  className="px-4 py-2 rounded-full border border-stone-300 hover:border-stone-800 text-xs font-semibold text-stone-800 flex items-center gap-1.5 transition-colors cursor-pointer bg-stone-50 hover:bg-stone-100"
+                  onClick={handlePrintInvoice}
+                  className={`px-4 py-2 rounded-full border text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    isDelivered 
+                      ? "border-stone-300 hover:border-stone-800 text-stone-800 bg-stone-50 hover:bg-stone-100" 
+                      : "border-amber-300 text-amber-900 bg-amber-50 hover:bg-amber-100"
+                  }`}
+                  title={isDelivered ? "Print official invoice" : "Invoice available only after delivery"}
                 >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print Invoice</span>
+                  {isDelivered ? (
+                    <>
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Print Invoice</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-3.5 h-3.5 text-amber-700" />
+                      <span>Invoice (Delivery Pending)</span>
+                    </>
+                  )}
                 </button>
                 <Link
                   href={`/track?id=${order.id}`}
@@ -305,6 +331,31 @@ export default function OrderDetailPage() {
                 </Link>
               </div>
             </div>
+
+            {/* Warning Banner if order is not delivered */}
+            {!isDelivered && (
+              <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-300 text-amber-900 text-xs flex items-start gap-3 shadow-xs print:hidden">
+                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <span>Tax Invoice &amp; Delivery Receipt Notice:</span>
+                    <span className="text-[10px] px-2 py-0.5 bg-amber-200/80 rounded font-mono uppercase">Delivery Required</span>
+                  </p>
+                  <p className="text-[11px] leading-relaxed text-amber-800">
+                    The official GST Tax Invoice and final commercial delivery receipt can only be downloaded or printed <strong>after your parcel has been successfully delivered</strong>. Your order is currently in <strong className="uppercase underline">{status}</strong> status.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Pre-Delivery Print Watermark for unauthorized print attempts */}
+            {!isDelivered && (
+              <div className="hidden print:block p-8 border-2 border-dashed border-stone-400 rounded-2xl text-center space-y-2 mb-4">
+                <h3 className="font-serif-luxury text-lg font-bold text-stone-900 uppercase">Pre-Delivery Dispatch Acknowledgment</h3>
+                <p className="text-xs text-stone-600">Official GST Tax Invoice is generated and valid only after package delivery.</p>
+                <p className="text-xs font-bold text-stone-800">Order #{order.id} • Current Status: {status}</p>
+              </div>
+            )}
 
             {/* Live Progress Tracker */}
             <div className="bg-stone-50 rounded-2xl p-5 border border-stone-200 space-y-4 print:bg-white">
@@ -502,6 +553,67 @@ export default function OrderDetailPage() {
 
         </div>
       </main>
+
+      {/* Invoice Delivery Warning Modal */}
+      {showInvoiceWarning && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-amber-900/15 space-y-5 animate-in zoom-in-95">
+            <div className="flex items-start justify-between">
+              <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-900 flex items-center justify-center">
+                <AlertCircle className="w-6 h-6 text-amber-700" />
+              </div>
+              <button
+                onClick={() => setShowInvoiceWarning(false)}
+                className="p-2 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-[10px] uppercase font-bold text-amber-800 tracking-wider bg-amber-100 px-2.5 py-0.5 rounded-full inline-block">
+                Delivery Required
+              </span>
+              <h3 className="font-serif-luxury text-xl font-bold text-stone-900">
+                Invoice Available After Delivery
+              </h3>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                The official GST Tax Invoice and commercial receipt can only be downloaded or printed <strong>after your order has been successfully delivered</strong>.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-[#FAF7F2] border border-stone-200 text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-stone-500">Order ID:</span>
+                <span className="font-mono font-bold text-[#3E0C15]">{order.id}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-stone-500">Current Status:</span>
+                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[11px] uppercase">
+                  {status}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+              <Link
+                href={`/track?id=${order.id}`}
+                onClick={() => setShowInvoiceWarning(false)}
+                className="flex-1 py-3 px-4 rounded-full bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-xs transition-all text-center"
+              >
+                <Truck className="w-3.5 h-3.5" />
+                <span>Track Live Shipment</span>
+              </Link>
+              <button
+                onClick={() => setShowInvoiceWarning(false)}
+                className="py-3 px-5 rounded-full border border-stone-300 hover:border-stone-800 text-stone-700 hover:text-stone-900 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
+              >
+                Understood
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </>

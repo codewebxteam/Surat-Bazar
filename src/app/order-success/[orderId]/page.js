@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useState, useEffect } from "react";
 import Link from "next/link";
 import { 
   CheckCircle2, 
@@ -11,16 +11,35 @@ import {
   ShieldCheck,
   Calendar,
   MapPin,
-  HeartHandshake
+  HeartHandshake,
+  CreditCard
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function OrderSuccessPage({ params }) {
   const unwrapped = use(params);
   const { orderId } = unwrapped;
 
   const displayOrderId = orderId || `SHR-${Math.floor(100000 + Math.random() * 900000)}`;
+  const [orderData, setOrderData] = useState(null);
+
+  useEffect(() => {
+    async function fetchOrderInfo() {
+      if (!displayOrderId) return;
+      try {
+        const snap = await getDoc(doc(db, "orders", displayOrderId));
+        if (snap.exists()) {
+          setOrderData(snap.data());
+        }
+      } catch (e) {
+        console.warn("Could not fetch order:", e);
+      }
+    }
+    fetchOrderInfo();
+  }, [displayOrderId]);
 
   return (
     <>
@@ -53,13 +72,27 @@ export default function OrderSuccessPage({ params }) {
 
           {/* Order ID Box */}
           <div className="my-6 p-4 rounded-2xl bg-[#FAF7F2] border border-stone-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-            <div className="text-left">
+            <div className="text-center sm:text-left">
               <span className="text-stone-400 text-[10px] uppercase font-bold tracking-wider block">Your Order ID</span>
               <span className="font-mono text-base font-bold text-[#3E0C15]">{displayOrderId}</span>
             </div>
-            <div className="text-right">
+
+            {orderData?.paymentMethod && (
+              <div className="text-center">
+                <span className="text-stone-400 text-[10px] uppercase font-bold tracking-wider block">Payment Mode</span>
+                <span className="font-semibold text-emerald-800 flex items-center justify-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{orderData.paymentMethod}</span>
+                </span>
+                {orderData?.totalAmount && (
+                  <span className="text-[11px] text-stone-500 font-mono block mt-0.5">₹{orderData.totalAmount.toLocaleString("en-IN")}</span>
+                )}
+              </div>
+            )}
+
+            <div className="text-center sm:text-right">
               <span className="text-stone-400 text-[10px] uppercase font-bold tracking-wider block">Estimated Delivery</span>
-              <span className="font-semibold text-emerald-800">Thursday, 3 Business Days</span>
+              <span className="font-semibold text-emerald-800">3-4 Business Days</span>
             </div>
           </div>
 
