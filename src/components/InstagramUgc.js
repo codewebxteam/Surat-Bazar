@@ -1,5 +1,8 @@
+"use client";
+
 import Image from "next/image";
 import { Heart, ArrowUpRight } from "lucide-react";
+import { useStoreConfig } from "@/context/StoreConfigContext";
 
 export const UGC_POSTS_DATA = [
   {
@@ -53,6 +56,9 @@ export const UGC_POSTS_DATA = [
 ];
 
 export default function InstagramUgc({ posts = UGC_POSTS_DATA }) {
+  const { config } = useStoreConfig();
+  const instagramUrl = config?.socialLinks?.instagram || "https://instagram.com/suratbazar_official";
+
   return (
     <section className="py-12 sm:py-16 md:py-20 bg-[#FAF7F2]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12">
@@ -74,12 +80,12 @@ export default function InstagramUgc({ posts = UGC_POSTS_DATA }) {
           </div>
 
           <a
-            href="https://instagram.com"
+            href={instagramUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#3E0C15] hover:text-[#571520] transition-colors group"
           >
-            <span>Follow @suratbazar_official</span>
+            <span>Follow Our Instagram</span>
             <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
           </a>
         </div>
@@ -93,7 +99,7 @@ export default function InstagramUgc({ posts = UGC_POSTS_DATA }) {
           {posts.map((post) => (
             <a
               key={post.id}
-              href={post.socialUrl}
+              href={instagramUrl}
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`View Instagram post by ${post.handle}`}

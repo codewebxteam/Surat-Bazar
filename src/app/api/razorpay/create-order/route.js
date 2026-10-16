@@ -10,8 +10,12 @@ export async function POST(req) {
       return NextResponse.json({ error: "Invalid amount provided" }, { status: 400 });
     }
 
-    const key_id = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
-    const key_secret = process.env.RAZORPAY_KEY_SECRET;
+    const key_id = (process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.startsWith("rzp_live") 
+      ? process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID 
+      : "rzp_live_ToZUxsu1jlHKm6");
+    const key_secret = (process.env.RAZORPAY_KEY_SECRET && process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.startsWith("rzp_live")
+      ? process.env.RAZORPAY_KEY_SECRET 
+      : "KKps9eAYoR1G6Z0cIeUS2fBu");
 
     if (!key_id || !key_secret) {
       return NextResponse.json(

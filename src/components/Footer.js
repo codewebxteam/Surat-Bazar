@@ -12,12 +12,29 @@ import {
 } from "lucide-react";
 import { FOOTER_COLUMNS } from "@/data/navigation";
 import { SITE_CONFIG } from "@/data/siteConfig";
+import { useStoreConfig } from "@/context/StoreConfigContext";
 import VastraLogo from "@/components/VastraLogo";
 
 export default function Footer({ 
   columns = FOOTER_COLUMNS, 
-  config = SITE_CONFIG 
+  config: propConfig 
 }) {
+  const { config: liveConfig } = useStoreConfig();
+  const config = liveConfig || propConfig || SITE_CONFIG;
+
+  const socialLinksList = [
+    {
+      label: "Instagram",
+      href: config.socialLinks?.instagram || "https://instagram.com/suratbazar_official",
+      icon: "instagram"
+    },
+    {
+      label: "Facebook",
+      href: config.socialLinks?.facebook || "https://facebook.com/suratbazar_official",
+      icon: "facebook"
+    }
+  ];
+
   return (
     <footer className="bg-[#120705] text-[#FAF7F2] border-t border-amber-900/40 relative overflow-hidden">
       
@@ -54,19 +71,19 @@ export default function Footer({
             <MapPin className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold text-white block">Surat Flagship Studio &amp; Head Office:</span>
-              <span className="text-stone-400 text-[11px] leading-relaxed">{config.contact.address}</span>
+              <span className="text-stone-400 text-[11px] leading-relaxed">{config.contact?.address}</span>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4 sm:gap-6 shrink-0">
             <a 
-              href={`tel:${config.contact.phone.replace(/[^0-9+]/g, '')}`} 
+              href={`tel:${(config.contact?.phone || "").replace(/[^0-9+]/g, '')}`} 
               className="inline-flex items-center gap-1.5 hover:text-amber-300 transition-colors"
             >
               <Phone className="w-3.5 h-3.5 text-amber-400" />
-              <span>{config.contact.phone}</span>
+              <span>{config.contact?.phone}</span>
             </a>
             <a 
-              href={`https://wa.me/${config.contact.whatsapp.replace(/[^0-9]/g, '')}?text=Hello%20Suratbazar%2C%20I%20have%20an%20inquiry`} 
+              href={`https://wa.me/${(config.contact?.whatsapp || config.contact?.phone || "").replace(/[^0-9]/g, '')}?text=Hello%20Suratbazar%2C%20I%20have%20an%20inquiry`} 
               target="_blank" 
               rel="noopener noreferrer" 
               className="inline-flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 transition-colors font-medium bg-emerald-950/40 px-2.5 py-1 rounded-full border border-emerald-500/20"
@@ -75,11 +92,11 @@ export default function Footer({
               <span>WhatsApp Concierge</span>
             </a>
             <a 
-              href={`mailto:${config.contact.email}`} 
+              href={`mailto:${config.contact?.email}`} 
               className="inline-flex items-center gap-1.5 hover:text-amber-300 transition-colors"
             >
               <Mail className="w-3.5 h-3.5 text-amber-400" />
-              <span>{config.contact.email}</span>
+              <span>{config.contact?.email}</span>
             </a>
           </div>
         </div>
@@ -94,31 +111,28 @@ export default function Footer({
               
               {col.id === "social" ? (
                 <ul className="space-y-3 text-xs text-stone-300">
-                  {col.links.map((link, idx) => {
-                    const isInsta = link.label.toLowerCase().includes("instagram");
-                    return (
-                      <li key={idx}>
-                        <a
-                          href={link.href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 hover:border-amber-400/40 text-stone-300 hover:text-amber-300 transition-all group w-full"
-                        >
-                          {isInsta ? (
-                            <svg className="w-4 h-4 fill-current text-pink-400 group-hover:scale-110 transition-transform shrink-0" viewBox="0 0 24 24">
-                              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-                            </svg>
-                          ) : (
-                            <svg className="w-4 h-4 fill-current text-blue-400 group-hover:scale-110 transition-transform shrink-0" viewBox="0 0 24 24">
-                              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                            </svg>
-                          )}
-                          <span className="font-medium">{link.label}</span>
-                          <ArrowUpRight className="w-3 h-3 text-stone-500 group-hover:text-amber-300 transition-colors ml-auto" />
-                        </a>
-                      </li>
-                    );
-                  })}
+                  {socialLinksList.map((link, idx) => (
+                    <li key={idx}>
+                      <a
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 hover:border-amber-400/40 text-stone-300 hover:text-amber-300 transition-all group w-full"
+                      >
+                        {link.icon === "instagram" ? (
+                          <svg className="w-4 h-4 fill-current text-pink-400 group-hover:scale-110 transition-transform shrink-0" viewBox="0 0 24 24">
+                            <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4 fill-current text-blue-400 group-hover:scale-110 transition-transform shrink-0" viewBox="0 0 24 24">
+                            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                          </svg>
+                        )}
+                        <span className="font-medium">{link.label}</span>
+                        <ArrowUpRight className="w-3 h-3 text-stone-500 group-hover:text-amber-300 transition-colors ml-auto" />
+                      </a>
+                    </li>
+                  ))}
                 </ul>
               ) : (
                 <ul className="space-y-2.5 text-xs text-stone-300">
@@ -145,7 +159,7 @@ export default function Footer({
           
           {/* Copyright & Entity */}
           <div className="text-center md:text-left space-y-1">
-            <p>© 2026 {config.brandName} Handlooms Pvt. Ltd. All rights reserved. <Link href="/admin" className="inline-block ml-2 text-stone-700 hover:text-stone-400 opacity-50 transition-colors text-[10px]">Admin</Link></p>
+            <p>© 2026 {config.brandName} Handlooms Pvt. Ltd. All rights reserved.</p>
             <p className="text-[11px] text-stone-500 font-light">
               Crafted in reverence of the Indian Handloom Tradition. Silk Mark Registered.
             </p>

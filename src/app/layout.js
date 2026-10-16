@@ -2,6 +2,7 @@ import { Cormorant_Garamond, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { CartWishlistProvider } from "@/context/CartWishlistContext";
 import { AuthProvider } from "@/context/AuthContext";
+import { StoreConfigProvider } from "@/context/StoreConfigContext";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import WelcomeModal from "@/components/WelcomeModal";
 
@@ -29,15 +30,17 @@ export default function RootLayout({ children }) {
       className={`${cormorant.variable} ${jakarta.variable} h-full antialiased scroll-smooth`}
     >
       <body className="min-h-full flex flex-col font-sans bg-[#FAF7F2] text-[#1F1815] selection:bg-[#E8C574] selection:text-[#2A170F] pb-16 lg:pb-0">
-        <AuthProvider>
-          <CartWishlistProvider>
-            {children}
-            {/* Welcome Greeting Popup After Login */}
-            <WelcomeModal />
-            {/* Fixed Mobile Bottom Navigation Tab (Hidden on Desktop) */}
-            <MobileBottomNav />
-          </CartWishlistProvider>
-        </AuthProvider>
+        <StoreConfigProvider>
+          <AuthProvider>
+            <CartWishlistProvider>
+              {children}
+              {/* Welcome Greeting Popup After Login */}
+              <WelcomeModal />
+              {/* Fixed Mobile Bottom Navigation Tab (Hidden on Desktop) */}
+              <MobileBottomNav />
+            </CartWishlistProvider>
+          </AuthProvider>
+        </StoreConfigProvider>
       </body>
     </html>
   );

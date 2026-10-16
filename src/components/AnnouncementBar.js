@@ -34,6 +34,28 @@ export default function AnnouncementBar({
   const timerRef = useRef(null);
 
   useEffect(() => {
+    // 1. Instant local storage cache check
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("suratbazar_promotions");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed.announcementText && parsed.announcementText.trim()) {
+            setActiveMessages([
+              {
+                id: "admin-announcement-cached",
+                text: parsed.announcementText.trim(),
+                icon: "Sparkles",
+                highlight: "LIVE OFFER",
+                badge: "OFFICIAL"
+              },
+              ...DEFAULT_ANNOUNCEMENTS.slice(1)
+            ]);
+          }
+        }
+      } catch (e) {}
+    }
+
     async function fetchDynamicPromotions() {
       try {
         const docRef = doc(db, "settings", "promotions");

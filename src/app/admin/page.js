@@ -57,11 +57,11 @@ export default function AdminDashboardPage() {
       let pendingCount = 0;
       allOrdersSnap.docs.forEach(doc => {
         const data = doc.data();
-        if (data.status !== "Cancelled") {
+        if (!data.status || !data.status.toLowerCase().includes("cancel")) {
           revenueSum += (Number(data.totalAmount) || 0);
         }
         const status = (data.status || "").toLowerCase();
-        if (status === "pending" || status === "confirmed" || status === "processing") {
+        if (!status.includes("deliver") && !status.includes("cancel")) {
           pendingCount += 1;
         }
       });
@@ -92,7 +92,7 @@ export default function AdminDashboardPage() {
       setPatronsCount(customers.length);
 
     } catch (err) {
-      console.error("Dashboard data fetching error:", err);
+      console.warn("Notice: Dashboard data fetching error:", err?.message || err);
     } finally {
       setLoading(false);
     }
@@ -103,19 +103,12 @@ export default function AdminDashboardPage() {
   }, []);
 
   const statusBadge = (status = "") => {
-    switch (status.toLowerCase()) {
-      case "delivered":
-        return "bg-emerald-100 text-emerald-800 border-emerald-200";
-      case "dispatched":
-        return "bg-sky-100 text-sky-800 border-sky-200";
-      case "processing":
-      case "confirmed":
-        return "bg-amber-100 text-amber-800 border-amber-200";
-      case "cancelled":
-        return "bg-rose-100 text-rose-800 border-rose-200";
-      default:
-        return "bg-stone-100 text-stone-800 border-stone-200";
-    }
+    const s = (status || "").toLowerCase().trim();
+    if (s.includes("cancel")) return "bg-rose-100 text-rose-800 border-rose-300";
+    if (s.includes("deliver")) return "bg-emerald-100 text-emerald-800 border-emerald-300";
+    if (s.includes("dispatch") || s.includes("transit")) return "bg-sky-100 text-sky-800 border-sky-300";
+    if (s.includes("quality") || s.includes("packag") || s.includes("process")) return "bg-amber-100 text-amber-800 border-amber-300";
+    return "bg-purple-100 text-purple-800 border-purple-300";
   };
 
   return (
@@ -243,7 +236,7 @@ export default function AdminDashboardPage() {
                       <th className="pb-3 pl-2">Order ID</th>
                       <th className="pb-3">Customer</th>
                       <th className="pb-3">Item Details</th>
-                      <th className="pb-3">Amount</th>
+                      <th className="pb-3">Amount & Mode</th>
                       <th className="pb-3">Status</th>
                       <th className="pb-3 text-right pr-2">Action</th>
                     </tr>
@@ -267,8 +260,23 @@ export default function AdminDashboardPage() {
                           <td className="py-3.5 text-stone-700 max-w-[160px] truncate" title={itemSummary}>
                             {itemSummary}
                           </td>
-                          <td className="py-3.5 font-semibold text-stone-900">
-                            ₹{(Number(order.totalAmount) || 0).toLocaleString("en-IN")}
+                          <td className="py-3.5">
+                            <div className="font-semibold text-stone-900">
+                              ₹{(Number(order.totalAmount) || 0).toLocaleString("en-IN")}
+                            </div>
+                            <div className="mt-0.5">
+                              {(order.paymentStatus === "Paid" || Boolean(order.razorpayPaymentId)) ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  <span className="w-1 h-1 rounded-full bg-emerald-600" />
+                                  <span>Online (Paid)</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                                  <span className="w-1 h-1 rounded-full bg-amber-600" />
+                                  <span>COD</span>
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-3.5">
                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${statusBadge(order.status)}`}>

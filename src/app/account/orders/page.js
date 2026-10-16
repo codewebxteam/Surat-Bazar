@@ -119,14 +119,47 @@ export default function OrdersPage() {
                         <span className="text-stone-400 block text-[10px] uppercase tracking-wider">Grand Total</span>
                         <strong className="text-sm font-bold text-stone-900">₹{(order.totalAmount || 0).toLocaleString("en-IN")}</strong>
                       </div>
+                      <div>
+                        <span className="text-stone-400 block text-[10px] uppercase tracking-wider">Payment Mode</span>
+                        {(order.paymentStatus === "Paid" || Boolean(order.razorpayPaymentId)) ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                            <span>Online (Paid)</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300 shadow-xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                            <span>Cash on Delivery (COD)</span>
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-3">
-                        <span className={`px-3.5 py-1 font-bold rounded-full text-xs ${
-                          order.status === "Delivered" ? "bg-emerald-100 text-emerald-800" :
-                          order.status === "Dispatched" || order.status === "In Transit" ? "bg-sky-100 text-sky-800" :
-                          "bg-amber-100 text-[#3E0C15]"
-                        }`}>
-                          {order.status || "Processing"}
-                        </span>
+                        {(() => {
+                          const s = (order.status || "").toLowerCase().trim();
+                          let badgeClass = "bg-purple-100 text-purple-900 border border-purple-200";
+                          let label = order.status || "Order Placed & Confirmed";
+                          if (s.includes("cancel")) {
+                            badgeClass = "bg-rose-100 text-rose-800 border border-rose-200";
+                            label = "Cancelled";
+                          } else if (s.includes("deliver")) {
+                            badgeClass = "bg-emerald-100 text-emerald-800 border border-emerald-200";
+                            label = "Delivered to Doorstep";
+                          } else if (s.includes("dispatch") || s.includes("transit")) {
+                            badgeClass = "bg-sky-100 text-sky-800 border border-sky-200";
+                            label = "Dispatched & Express Transit";
+                          } else if (s.includes("quality") || s.includes("packag") || s.includes("process")) {
+                            badgeClass = "bg-amber-100 text-amber-900 border border-amber-200";
+                            label = "Quality Check & Artisan Packaging";
+                          } else {
+                            badgeClass = "bg-purple-100 text-purple-900 border border-purple-200";
+                            label = "Order Placed & Confirmed";
+                          }
+                          return (
+                            <span className={`px-3.5 py-1 font-bold rounded-full text-xs ${badgeClass}`}>
+                              {label}
+                            </span>
+                          );
+                        })()}
                         <Link 
                           href={`/account/orders/${order.id}`} 
                           onClick={() => {

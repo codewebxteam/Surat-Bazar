@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { getPromotionsData, normalizeCoupon, calculateCouponDiscount } from "@/lib/promotions";
 
 const CartWishlistContext = createContext(null);
 
@@ -11,13 +12,21 @@ export function CartWishlistProvider({ children }) {
   const { user, loading: authLoading } = useAuth();
   const [cart, setCart] = useState([]);
   const [wishlist, setWishlist] = useState([]);
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
   
   // Keep track of whether data is loaded to prevent overwriting cloud data with empty array
   const isInitialized = useRef(false);
 
-  // Load from localStorage on mount (Guest Mode)
+  // Load from localStorage on mount (Guest Mode + Applied Coupon)
   useEffect(() => {
+    try {
+      const savedCoupon = localStorage.getItem("suratbazar_applied_coupon");
+      if (savedCoupon) {
+        setAppliedCoupon(JSON.parse(savedCoupon));
+      }
+    } catch (e) {}
+
     if (!user && !authLoading) {
       try {
         const savedCart = localStorage.getItem("suratbazar_cart") || localStorage.getItem("shringaar_cart");
@@ -155,10 +164,69 @@ export function CartWishlistProvider({ children }) {
 
   const clearCart = () => {
     setCart([]);
+    setAppliedCoupon(null);
+    try {
+      localStorage.removeItem("suratbazar_applied_coupon");
+    } catch (e) {}
+  };
+
+  const applyCoupon = async (codeOrObj, customSubtotal) => {
+    try {
+      let coupon = null;
+      if (typeof codeOrObj === "object" && codeOrObj !== null) {
+        coupon = normalizeCoupon(codeOrObj);
+      } else if (typeof codeOrObj === "string") {
+        const cleanCode = codeOrObj.trim().toUpperCase();
+        const data = await getPromotionsData();
+        coupon = data.coupons.find((c) => c.code === cleanCode && c.isActive);
+        if (!coupon) {
+          return { success: false, error: `Coupon "${cleanCode}" is invalid or expired.` };
+        }
+      }
+
+      if (!coupon || !coupon.isActive) {
+        return { success: false, error: "This promo offer is currently inactive." };
+      }
+
+      if (coupon.type === "info") {
+        return { success: false, error: "This is an informational privilege, not a discount code." };
+      }
+
+      const effectiveSubtotal = typeof customSubtotal === "number" ? customSubtotal : cartSubtotal;
+      const minOrder = Number(coupon.minOrder) || 0;
+
+      if (minOrder > 0 && effectiveSubtotal < minOrder) {
+        return {
+          success: false,
+          error: `Minimum bag total of ₹${minOrder.toLocaleString("en-IN")} required for "${coupon.code}". (Current: ₹${effectiveSubtotal.toLocaleString("en-IN")})`,
+        };
+      }
+
+      const discount = calculateCouponDiscount(coupon, effectiveSubtotal);
+      setAppliedCoupon(coupon);
+      try {
+        localStorage.setItem("suratbazar_applied_coupon", JSON.stringify(coupon));
+      } catch (e) {}
+
+      showToast(`Privilege Code "${coupon.code}" Applied! Saved ₹${discount.toLocaleString("en-IN")} 🎉`);
+      return { success: true, discount, coupon };
+    } catch (err) {
+      console.error("Error applying coupon:", err);
+      return { success: false, error: "Failed to apply privilege code. Please try again." };
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    try {
+      localStorage.removeItem("suratbazar_applied_coupon");
+    } catch (e) {}
+    showToast("Privilege coupon removed.");
   };
 
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
   const cartSubtotal = cart.reduce((total, item) => total + item.price * item.quantity, 0);
+  const couponDiscount = appliedCoupon ? calculateCouponDiscount(appliedCoupon, cartSubtotal) : 0;
 
   return (
     <CartWishlistContext.Provider
@@ -173,6 +241,10 @@ export function CartWishlistProvider({ children }) {
         clearCart,
         cartCount,
         cartSubtotal,
+        appliedCoupon,
+        applyCoupon,
+        removeCoupon,
+        couponDiscount,
         showToast
       }}
     >

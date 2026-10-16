@@ -77,18 +77,30 @@ export default function OrderSuccessPage({ params }) {
               <span className="font-mono text-base font-bold text-[#3E0C15]">{displayOrderId}</span>
             </div>
 
-            {orderData?.paymentMethod && (
-              <div className="text-center">
-                <span className="text-stone-400 text-[10px] uppercase font-bold tracking-wider block">Payment Mode</span>
-                <span className="font-semibold text-emerald-800 flex items-center justify-center gap-1">
+            <div className="text-center">
+              <span className="text-stone-400 text-[10px] uppercase font-bold tracking-wider block">Payment Mode</span>
+              {(orderData?.paymentStatus === "Paid" || Boolean(orderData?.razorpayPaymentId)) ? (
+                <span className="font-semibold text-emerald-800 flex items-center justify-center gap-1 text-xs">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>{orderData.paymentMethod}</span>
+                  <span>Online (Paid - Razorpay)</span>
                 </span>
-                {orderData?.totalAmount && (
-                  <span className="text-[11px] text-stone-500 font-mono block mt-0.5">₹{orderData.totalAmount.toLocaleString("en-IN")}</span>
-                )}
-              </div>
-            )}
+              ) : (
+                <span className="font-semibold text-amber-800 flex items-center justify-center gap-1 text-xs">
+                  <span className="w-2 h-2 rounded-full bg-amber-600" />
+                  <span>Cash on Delivery (Pay at Doorstep)</span>
+                </span>
+              )}
+              {orderData?.totalAmount && (
+                <span className="text-[11px] text-stone-500 font-mono block mt-0.5">
+                  ₹{orderData.totalAmount.toLocaleString("en-IN")}
+                  {orderData?.discount > 0 && (
+                    <span className="text-emerald-700 font-sans font-bold ml-1.5">
+                      (Saved ₹{orderData.discount.toLocaleString("en-IN")}{orderData.couponCode ? ` with ${orderData.couponCode}` : ""})
+                    </span>
+                  )}
+                </span>
+              )}
+            </div>
 
             <div className="text-center sm:text-right">
               <span className="text-stone-400 text-[10px] uppercase font-bold tracking-wider block">Estimated Delivery</span>

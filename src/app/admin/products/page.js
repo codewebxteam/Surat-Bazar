@@ -41,7 +41,7 @@ export default function AdminProductsPage() {
           setProductsList(PRODUCTS);
         }
       } catch (error) {
-        console.error("Error fetching products:", error);
+        console.warn("Notice: Fetching products from Firestore:", error?.message || error);
         if (error?.code === "permission-denied" || error?.message?.includes("permissions")) {
           setPermissionError(true);
         }
@@ -83,8 +83,8 @@ export default function AdminProductsPage() {
         await deleteDoc(doc(db, "products", id));
         setProductsList(productsList.filter((item) => item.id !== id));
       } catch (error) {
-        console.error("Error deleting product", error);
-        alert("Failed to delete product.");
+        console.warn("Notice: Error deleting product:", error?.message || error);
+        alert("Failed to delete product: " + (error?.message || "Check Firestore permissions"));
       }
     }
   };
@@ -95,8 +95,8 @@ export default function AdminProductsPage() {
       await updateDoc(doc(db, "products", id), { stock: newStock });
       setProductsList(productsList.map(item => item.id === id ? { ...item, stock: newStock } : item));
     } catch (error) {
-      console.error("Error updating stock:", error);
-      alert("Failed to update stock.");
+      console.warn("Notice: Error updating stock:", error?.message || error);
+      alert("Failed to update stock: " + (error?.message || "Check Firestore permissions"));
     }
   };
 

@@ -223,9 +223,12 @@ export default function OrderDetailPage() {
     ? order.createdAt.toDate().toLocaleString("en-IN", { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) 
     : "Recently Placed";
 
-  const status = order.status || "Pending";
-  const isDelivered = status.toLowerCase() === "delivered";
-  const isDispatched = status.toLowerCase() === "dispatched" || status.toLowerCase() === "in transit";
+  const status = order.status || "Order Placed & Confirmed";
+  const sLower = status.toLowerCase().trim();
+  const isCancelled = sLower.includes("cancel");
+  const isDelivered = sLower.includes("deliver");
+  const isDispatched = sLower.includes("dispatch") || sLower.includes("transit");
+  const isQualityChecked = isDispatched || isDelivered || sLower.includes("quality") || sLower.includes("packag") || sLower.includes("process");
 
   const handlePrintInvoice = () => {
     if (!isDelivered) {
@@ -365,51 +368,67 @@ export default function OrderDetailPage() {
                   <span>Status: {status}</span>
                 </span>
                 <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                  isDelivered 
-                    ? "bg-emerald-100 text-emerald-800" 
+                  isCancelled
+                    ? "bg-rose-100 text-rose-800 border border-rose-200"
+                    : isDelivered 
+                    ? "bg-emerald-100 text-emerald-800 border border-emerald-200" 
                     : isDispatched 
-                    ? "bg-sky-100 text-sky-800" 
-                    : "bg-amber-100 text-[#3E0C15]"
+                    ? "bg-sky-100 text-sky-800 border border-sky-200" 
+                    : isQualityChecked
+                    ? "bg-amber-100 text-amber-900 border border-amber-200"
+                    : "bg-purple-100 text-purple-900 border border-purple-200"
                 }`}>
-                  {isDelivered ? "Delivered Safely" : isDispatched ? "In Transit" : "Commission in Progress"}
+                  {isCancelled 
+                    ? "Cancelled" 
+                    : isDelivered 
+                    ? "Delivered to Doorstep" 
+                    : isDispatched 
+                    ? "Dispatched & Transit" 
+                    : isQualityChecked
+                    ? "Quality Check & Packaging"
+                    : "Order Placed & Confirmed"}
                 </span>
               </div>
 
               {/* Progress Milestones */}
               <div className="space-y-3 pt-2 text-xs">
-                <div className="flex items-center gap-3 text-emerald-800 font-bold">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>Order Placed & Silk Mark Authenticated ({orderDateDisplay})</span>
+                {/* 1. Placed */}
+                <div className={`flex items-center gap-3 ${isCancelled ? 'text-rose-800 font-bold' : 'text-emerald-800 font-bold'}`}>
+                  <CheckCircle2 className={`w-4 h-4 ${isCancelled ? 'text-rose-600' : 'text-emerald-600'} shrink-0`} />
+                  <span>Order Placed & Confirmed ({orderDateDisplay})</span>
                 </div>
                 
-                <div className={`flex items-center gap-3 ${status !== 'Pending' ? 'text-emerald-800 font-bold' : 'text-amber-800 font-semibold'}`}>
-                  {status !== 'Pending' ? (
+                {/* 2. Quality Check & Packaging */}
+                <div className={`flex items-center gap-3 ${!isCancelled && isQualityChecked ? 'text-emerald-800 font-bold' : isCancelled ? 'text-stone-400' : 'text-amber-800 font-semibold'}`}>
+                  {!isCancelled && isQualityChecked ? (
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                   ) : (
                     <Clock className="w-4 h-4 text-amber-600 shrink-0" />
                   )}
-                  <span>Artisan Quality Inspection & Garment Packaging</span>
+                  <span>Quality Check & Artisan Packaging</span>
                 </div>
 
-                <div className={`flex items-center gap-3 ${isDispatched || isDelivered ? 'text-emerald-800 font-bold' : 'text-stone-400'}`}>
-                  {isDispatched || isDelivered ? (
+                {/* 3. Dispatched & Express Transit */}
+                <div className={`flex items-center gap-3 ${!isCancelled && (isDispatched || isDelivered) ? 'text-emerald-800 font-bold' : 'text-stone-400'}`}>
+                  {!isCancelled && (isDispatched || isDelivered) ? (
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                   ) : (
                     <div className="w-4 h-4 rounded-full border-2 border-stone-300 shrink-0" />
                   )}
                   <span>
-                    Dispatched with Insured Express Air Courier
+                    Dispatched & Express Transit
                     {order.trackingId ? ` • AWB #${order.trackingId}` : ""}
                   </span>
                 </div>
 
-                <div className={`flex items-center gap-3 ${isDelivered ? 'text-emerald-800 font-bold' : 'text-stone-400'}`}>
-                  {isDelivered ? (
+                {/* 4. Delivered to Doorstep */}
+                <div className={`flex items-center gap-3 ${!isCancelled && isDelivered ? 'text-emerald-800 font-bold' : 'text-stone-400'}`}>
+                  {!isCancelled && isDelivered ? (
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                   ) : (
                     <div className="w-4 h-4 rounded-full border-2 border-stone-300 shrink-0" />
                   )}
-                  <span>Out for Doorstep Delivery & Handover</span>
+                  <span>Delivered to Doorstep</span>
                 </div>
               </div>
             </div>
@@ -495,20 +514,42 @@ export default function OrderDetailPage() {
                   <span>Payment Details</span>
                 </h4>
                 <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200/80 space-y-2 text-stone-700">
-                  <div className="flex justify-between">
-                    <span className="text-stone-500">Mode:</span>
-                    <span className="font-semibold text-stone-900 uppercase">{order.paymentMethod || "Prepaid Online"}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-stone-500">Payment Mode:</span>
+                    {(order.paymentStatus === "Paid" || Boolean(order.razorpayPaymentId)) ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                        <span>Online (Paid - Razorpay)</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                        <span>Cash on Delivery (COD)</span>
+                      </span>
+                    )}
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
+                    <span className="text-stone-500">Payment Status:</span>
+                    {(order.paymentStatus === "Paid" || Boolean(order.razorpayPaymentId)) ? (
+                      <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold">
+                        100% Paid & Verified
+                      </span>
+                    ) : (
+                      <span className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded text-[10px] font-bold">
+                        Pay on Doorstep Delivery
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center">
                     <span className="text-stone-500">Order Reference:</span>
                     <span className="font-mono text-stone-800">{order.id}</span>
                   </div>
-                  <div className="flex justify-between items-center text-emerald-800 font-bold pt-1 border-t border-stone-200/60">
-                    <span>Payment Status:</span>
-                    <span className="bg-emerald-100 px-2 py-0.5 rounded text-[10px]">
-                      {status === "Pending" ? "Processing / Verified" : "Confirmed"}
-                    </span>
-                  </div>
+                  {order.razorpayPaymentId && (
+                    <div className="flex justify-between items-center pt-1 border-t border-stone-200/60 text-[11px]">
+                      <span className="text-stone-500">Payment Ref ID:</span>
+                      <span className="font-mono text-stone-700">{order.razorpayPaymentId}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -521,10 +562,10 @@ export default function OrderDetailPage() {
                 <span className="font-semibold text-stone-900">₹{itemsSubtotal.toLocaleString("en-IN")}</span>
               </div>
               
-              {itemsSubtotal > grandTotal && (
+              {(order.discount > 0 || itemsSubtotal > grandTotal) && (
                 <div className="flex justify-between text-emerald-800 font-semibold">
-                  <span>Privilege Promotional Discount</span>
-                  <span>-₹{(itemsSubtotal - grandTotal).toLocaleString("en-IN")}</span>
+                  <span>Privilege Promotional Discount {order.couponCode ? `(${order.couponCode})` : ""}</span>
+                  <span>-₹{(order.discount || (itemsSubtotal - grandTotal)).toLocaleString("en-IN")}</span>
                 </div>
               )}
 

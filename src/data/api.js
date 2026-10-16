@@ -17,6 +17,7 @@ import { HERO_SLIDES, ANNOUNCEMENT_MESSAGES, MARQUEE_ITEMS, PROMOTIONAL_COUPONS 
 import { TESTIMONIALS, INSTAGRAM_POSTS } from "./reviews";
 import { FILTER_CRITERIA } from "./filters";
 import { SITE_CONFIG } from "./siteConfig";
+import { getPromotionsData } from "@/lib/promotions";
 
 // 1. PRODUCT QUERIES
 export async function getProducts(options = {}) {
@@ -109,6 +110,12 @@ export async function getMarqueeItems() {
 }
 
 export async function getPromotions() {
+  try {
+    const data = await getPromotionsData();
+    if (data?.coupons && data.coupons.length > 0) {
+      return data.coupons;
+    }
+  } catch (e) {}
   return PROMOTIONAL_COUPONS;
 }
 

@@ -146,98 +146,147 @@ function TrackOrderContent() {
                   <h3 className="font-serif font-bold text-xl sm:text-2xl text-stone-900 mt-0.5">Order #{order.id}</h3>
                   <p className="text-xs text-stone-500 mt-0.5">Placed on {order.date || "Recent"}</p>
                 </div>
-                <div className={`px-4 py-1.5 rounded-full text-xs font-bold ${
-                  order.status === "Delivered" ? "bg-emerald-100 text-emerald-800 border border-emerald-200" :
-                  order.status === "Dispatched" || order.status === "In Transit" ? "bg-sky-100 text-sky-800 border border-sky-200" :
-                  order.status === "Confirmed" ? "bg-emerald-100 text-emerald-800 border border-emerald-200" :
-                  order.status === "Processing" ? "bg-amber-100 text-amber-800 border border-amber-200" :
-                  "bg-purple-100 text-purple-800 border border-purple-200"
-                }`}>
-                  {order.status === "Confirmed" ? "Confirmed & Verified" : order.status}
-                </div>
+                {(() => {
+                  const s = (order.status || "").toLowerCase().trim();
+                  let badgeClass = "bg-purple-100 text-purple-800 border-purple-200";
+                  let label = order.status || "Order Placed & Confirmed";
+
+                  if (s.includes("cancel")) {
+                    badgeClass = "bg-rose-100 text-rose-800 border-rose-200";
+                    label = "Cancelled";
+                  } else if (s.includes("deliver")) {
+                    badgeClass = "bg-emerald-100 text-emerald-800 border-emerald-200";
+                    label = "Delivered to Doorstep";
+                  } else if (s.includes("dispatch") || s.includes("transit")) {
+                    badgeClass = "bg-sky-100 text-sky-800 border-sky-200";
+                    label = "Dispatched & Express Transit";
+                  } else if (s.includes("quality") || s.includes("packag") || s.includes("process")) {
+                    badgeClass = "bg-amber-100 text-amber-800 border-amber-200";
+                    label = "Quality Check & Artisan Packaging";
+                  } else {
+                    badgeClass = "bg-purple-100 text-purple-800 border-purple-200";
+                    label = "Order Placed & Confirmed";
+                  }
+
+                  return (
+                    <div className={`px-4 py-1.5 rounded-full text-xs font-bold border ${badgeClass}`}>
+                      {label}
+                    </div>
+                  );
+                })()}
               </div>
+
+              {/* Cancelled Banner if applicable */}
+              {(order.status || "").toLowerCase().includes("cancel") && (
+                <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5">
+                  <div className="p-1 rounded-full bg-rose-200 text-rose-800 mt-0.5 font-bold text-[10px]">✕</div>
+                  <div>
+                    <h5 className="font-bold">Shipment Cancelled</h5>
+                    <p className="text-[11px] text-rose-700 mt-0.5">
+                      This order has been cancelled. For refunds or any inquiries, please contact our concierge concierge team.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Tracking Timeline */}
-              <div className="py-2 border-b border-stone-100">
-                <h4 className="font-bold text-stone-800 uppercase tracking-wider text-xs mb-6">Delivery Milestone Progress</h4>
-                
-                <div className="relative pl-6 space-y-6 pb-2">
-                  {/* Vertical Line */}
-                  <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-stone-200" />
+              {(() => {
+                const s = (order.status || "").toLowerCase().trim();
+                const isCancelled = s.includes("cancel");
+                let milestoneLevel = 1;
+                if (s.includes("deliver")) milestoneLevel = 4;
+                else if (s.includes("dispatch") || s.includes("transit")) milestoneLevel = 3;
+                else if (s.includes("quality") || s.includes("packag") || s.includes("process")) milestoneLevel = 2;
+                else milestoneLevel = 1;
 
-                  {/* 1. Order Placed */}
-                  <div className="relative">
-                    <div className="absolute -left-6 top-0 w-6 h-6 rounded-full border-4 border-white bg-emerald-500 z-10 flex items-center justify-center">
-                      <CheckCircle2 className="w-3 h-3 text-white" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-stone-900 text-sm">Order Placed & Confirmed</p>
-                      <p className="text-xs text-stone-500">
-                        {order.paymentStatus === "Paid" 
-                          ? "Payment verified via Razorpay. Order confirmed." 
-                          : "Order confirmed with Cash on Delivery."}
-                      </p>
+                return (
+                  <div className="py-2 border-b border-stone-100">
+                    <h4 className="font-bold text-stone-800 uppercase tracking-wider text-xs mb-6">Delivery Milestone Progress</h4>
+                    
+                    <div className="relative pl-6 space-y-6 pb-2">
+                      {/* Vertical Line */}
+                      <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-stone-200" />
+
+                      {/* 1. Order Placed & Confirmed */}
+                      <div className="relative">
+                        <div className={`absolute -left-6 top-0 w-6 h-6 rounded-full border-4 border-white z-10 flex items-center justify-center ${
+                          isCancelled ? "bg-rose-500" : "bg-emerald-500"
+                        }`}>
+                          <CheckCircle2 className="w-3 h-3 text-white" />
+                        </div>
+                        <div>
+                          <p className="font-bold text-stone-900 text-sm">Order Placed & Confirmed</p>
+                          <p className="text-xs text-stone-500">
+                            {order.paymentStatus === "Paid" 
+                              ? "Payment verified via Razorpay. Order confirmed." 
+                              : "Order confirmed with Cash on Delivery."}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* 2. Quality Check & Artisan Packaging */}
+                      <div className="relative">
+                        <div className={`absolute -left-6 top-0 w-6 h-6 rounded-full border-4 border-white z-10 flex items-center justify-center ${
+                          !isCancelled && milestoneLevel >= 2 ? "bg-emerald-500" : "bg-stone-200"
+                        }`}>
+                          {!isCancelled && milestoneLevel >= 2 ? (
+                            <CheckCircle2 className="w-3 h-3 text-white" />
+                          ) : (
+                            <div className="w-2 h-2 rounded-full bg-stone-400" />
+                          )}
+                        </div>
+                        <div>
+                          <p className={`font-bold text-sm ${!isCancelled && milestoneLevel >= 2 ? "text-stone-900" : "text-stone-400"}`}>
+                            Quality Check & Artisan Packaging
+                          </p>
+                          <p className="text-xs text-stone-500">Inspecting silk mark authenticity and fall/pico finishing.</p>
+                        </div>
+                      </div>
+
+                      {/* 3. Dispatched & Express Transit */}
+                      <div className="relative">
+                        <div className={`absolute -left-6 top-0 w-6 h-6 rounded-full border-4 border-white z-10 flex items-center justify-center ${
+                          !isCancelled && milestoneLevel >= 3 ? "bg-emerald-500" : "bg-stone-200"
+                        }`}>
+                          {!isCancelled && milestoneLevel >= 3 ? (
+                            <CheckCircle2 className="w-3 h-3 text-white" />
+                          ) : (
+                            <Truck className="w-3 h-3 text-stone-400" />
+                          )}
+                        </div>
+                        <div>
+                          <p className={`font-bold text-sm ${!isCancelled && milestoneLevel >= 3 ? "text-stone-900" : "text-stone-400"}`}>
+                            Dispatched & Express Transit
+                          </p>
+                          <p className="text-xs text-stone-500">
+                            {order.trackingId ? `AWB Tracking #${order.trackingId} • ` : ""}
+                            Package handed over to our insured air courier partner.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* 4. Delivered to Doorstep */}
+                      <div className="relative">
+                        <div className={`absolute -left-6 top-0 w-6 h-6 rounded-full border-4 border-white z-10 flex items-center justify-center ${
+                          !isCancelled && milestoneLevel >= 4 ? "bg-emerald-500" : "bg-stone-200"
+                        }`}>
+                          {!isCancelled && milestoneLevel >= 4 ? (
+                            <CheckCircle2 className="w-3 h-3 text-white" />
+                          ) : (
+                            <Package className="w-3 h-3 text-stone-400" />
+                          )}
+                        </div>
+                        <div>
+                          <p className={`font-bold text-sm ${!isCancelled && milestoneLevel >= 4 ? "text-stone-900" : "text-stone-400"}`}>
+                            Delivered to Doorstep
+                          </p>
+                          <p className="text-xs text-stone-500">Delivered directly to your shipping destination.</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-
-                  {/* 2. Processing / Packaging */}
-                  <div className="relative">
-                    <div className={`absolute -left-6 top-0 w-6 h-6 rounded-full border-4 border-white z-10 flex items-center justify-center ${
-                      ["Confirmed", "Processing", "Dispatched", "Delivered"].includes(order.status) ? "bg-emerald-500" : "bg-stone-200"
-                    }`}>
-                      {["Confirmed", "Processing", "Dispatched", "Delivered"].includes(order.status) ? (
-                        <CheckCircle2 className="w-3 h-3 text-white" />
-                      ) : (
-                        <div className="w-2 h-2 rounded-full bg-stone-400" />
-                      )}
-                    </div>
-                    <div>
-                      <p className={`font-bold text-sm ${["Confirmed", "Processing", "Dispatched", "Delivered"].includes(order.status) ? "text-stone-900" : "text-stone-400"}`}>
-                        Quality Check & Artisan Packaging
-                      </p>
-                      <p className="text-xs text-stone-500">Inspecting silk mark authenticity and fall/pico finishing.</p>
-                    </div>
-                  </div>
-
-                  {/* 3. Dispatched */}
-                  <div className="relative">
-                    <div className={`absolute -left-6 top-0 w-6 h-6 rounded-full border-4 border-white z-10 flex items-center justify-center ${
-                      ["Dispatched", "Delivered"].includes(order.status) ? "bg-emerald-500" : "bg-stone-200"
-                    }`}>
-                      {["Dispatched", "Delivered"].includes(order.status) ? (
-                        <CheckCircle2 className="w-3 h-3 text-white" />
-                      ) : (
-                        <Truck className="w-3 h-3 text-stone-400" />
-                      )}
-                    </div>
-                    <div>
-                      <p className={`font-bold text-sm ${["Dispatched", "Delivered"].includes(order.status) ? "text-stone-900" : "text-stone-400"}`}>
-                        Dispatched & Express Transit
-                      </p>
-                      <p className="text-xs text-stone-500">Package handed over to our insured air courier partner.</p>
-                    </div>
-                  </div>
-
-                  {/* 4. Delivered */}
-                  <div className="relative">
-                    <div className={`absolute -left-6 top-0 w-6 h-6 rounded-full border-4 border-white z-10 flex items-center justify-center ${
-                      order.status === "Delivered" ? "bg-emerald-500" : "bg-stone-200"
-                    }`}>
-                      {order.status === "Delivered" ? (
-                        <CheckCircle2 className="w-3 h-3 text-white" />
-                      ) : (
-                        <Package className="w-3 h-3 text-stone-400" />
-                      )}
-                    </div>
-                    <div>
-                      <p className={`font-bold text-sm ${order.status === "Delivered" ? "text-stone-900" : "text-stone-400"}`}>
-                        Delivered to Doorstep
-                      </p>
-                      <p className="text-xs text-stone-500">Delivered directly to your shipping destination.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* Shipping & Payment Meta Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs pt-2">
@@ -267,12 +316,23 @@ function TrackOrderContent() {
                     <CreditCard className="w-3.5 h-3.5 text-amber-700" />
                     <span>Payment Information</span>
                   </span>
-                  <p className="font-semibold text-stone-800 flex items-center gap-2">
-                    <span>{order.paymentMethod || "Online"}</span>
-                    <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-100 text-emerald-800 font-bold">
-                      {order.paymentStatus || (order.paymentMethod?.includes("Razorpay") ? "Paid" : "Confirmed")}
-                    </span>
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                    {(order.paymentStatus === "Paid" || Boolean(order.razorpayPaymentId)) ? (
+                      <>
+                        <span className="font-semibold text-stone-900 text-xs">Online Payment (Razorpay)</span>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">
+                          100% Paid & Verified
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-semibold text-stone-900 text-xs">Cash on Delivery (COD)</span>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-900 font-bold border border-amber-300">
+                          Pay on Doorstep Delivery
+                        </span>
+                      </>
+                    )}
+                  </div>
                   {order.razorpayPaymentId && (
                     <p className="text-[11px] text-stone-500 font-mono">
                       Ref: {order.razorpayPaymentId}

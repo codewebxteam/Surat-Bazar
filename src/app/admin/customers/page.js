@@ -100,7 +100,7 @@ export default function AdminCustomersPage() {
         setCustomers(customersArray);
 
       } catch (error) {
-        console.error("Error fetching customers:", error);
+        console.warn("Notice: Fetching customers from Firestore:", error?.message || error);
       } finally {
         setLoading(false);
       }

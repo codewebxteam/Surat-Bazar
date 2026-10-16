@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { 
@@ -14,37 +14,85 @@ import {
   Tag, 
   Sparkles,
   Lock,
-  ArrowLeft
+  ArrowLeft,
+  X,
+  Check,
+  Loader2
 } from "lucide-react";
 import { useCartWishlist } from "@/context/CartWishlistContext";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { getPromotionsData, calculateCouponDiscount } from "@/lib/promotions";
 
 export default function CartPage() {
-  const { cart, updateQuantity, removeFromCart, cartSubtotal } = useCartWishlist();
-  const [couponCode, setCouponCode] = useState("");
-  const [appliedDiscount, setAppliedDiscount] = useState(0);
-  const [couponError, setCouponError] = useState("");
+  const { 
+    cart, 
+    updateQuantity, 
+    removeFromCart, 
+    cartSubtotal,
+    appliedCoupon,
+    applyCoupon,
+    removeCoupon
+  } = useCartWishlist();
 
-  const handleApplyCoupon = (e) => {
-    e.preventDefault();
+  const [couponCode, setCouponCode] = useState(appliedCoupon?.code || "");
+  const [couponError, setCouponError] = useState("");
+  const [availableOffers, setAvailableOffers] = useState([]);
+  const [applying, setApplying] = useState(false);
+
+  useEffect(() => {
+    if (appliedCoupon?.code) {
+      setCouponCode(appliedCoupon.code);
+    }
+  }, [appliedCoupon]);
+
+  useEffect(() => {
+    async function loadCoupons() {
+      try {
+        const data = await getPromotionsData();
+        const active = (data?.coupons || []).filter(c => c.isActive && c.type !== "info");
+        setAvailableOffers(active);
+      } catch (e) {}
+    }
+    loadCoupons();
+  }, []);
+
+  const handleApplyCoupon = async (e) => {
+    if (e) e.preventDefault();
     if (!couponCode.trim()) return;
 
-    if (couponCode.toUpperCase() === "ROYAL10") {
-      setAppliedDiscount(0.1); // 10% discount
-      setCouponError("");
-    } else if (couponCode.toUpperCase() === "SAREECLUB2000") {
-      setAppliedDiscount(2000 / (cartSubtotal || 1)); // flat 2000
-      setCouponError("");
+    setApplying(true);
+    setCouponError("");
+    const res = await applyCoupon(couponCode, cartSubtotal);
+    setApplying(false);
+
+    if (!res.success) {
+      setCouponError(res.error || "Invalid coupon code.");
     } else {
-      setCouponError("Invalid coupon code. Try 'ROYAL10' or 'SAREECLUB2000'");
+      setCouponError("");
     }
   };
 
-  const discountAmount = appliedDiscount < 1 
-    ? Math.round(cartSubtotal * appliedDiscount) 
-    : Math.min(cartSubtotal, Math.round(appliedDiscount * cartSubtotal));
-    
+  const handleApplyDirect = async (offer) => {
+    setCouponCode(offer.code);
+    setApplying(true);
+    setCouponError("");
+    const res = await applyCoupon(offer, cartSubtotal);
+    setApplying(false);
+    if (!res.success) {
+      setCouponError(res.error || "Coupon could not be applied.");
+    } else {
+      setCouponError("");
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    removeCoupon();
+    setCouponCode("");
+    setCouponError("");
+  };
+
+  const discountAmount = appliedCoupon ? calculateCouponDiscount(appliedCoupon, cartSubtotal) : 0;
   const shippingFee = 0; // Free express delivery
   const finalTotal = Math.max(0, cartSubtotal - discountAmount + shippingFee);
 
@@ -104,12 +152,11 @@ export default function CartPage() {
                   </div>
 
                   {cart.map((item, idx) => {
-                    const blousePrice = item.blouseOption === "standard" ? 1500 : item.blouseOption === "custom" ? 2500 : 0;
-                    const itemUnitPrice = item.price + blousePrice;
+                    const itemUnitPrice = item.price;
                     const itemLineTotal = itemUnitPrice * item.quantity;
 
                     return (
-                      <div key={`${item.id}-${item.blouseOption}-${idx}`} className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
+                      <div key={`${item.id}-${idx}`} className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
                         
                         {/* Saree Image */}
                         <Link href={`/product/${item.slug}`} className="relative w-24 sm:w-28 aspect-[3/4] rounded-2xl overflow-hidden bg-stone-100 shrink-0 border border-stone-200 shadow-sm group">
@@ -141,9 +188,9 @@ export default function CartPage() {
                           
                           {/* Blouse Option */}
                           <div className="text-xs text-stone-500 mt-1.5 flex items-center gap-1.5 flex-wrap">
-                            <span className="text-stone-400">Blouse:</span>
-                            <span className="font-semibold text-stone-800 capitalize bg-stone-100 px-2 py-0.5 rounded text-[11px]">
-                              {item.blouseOption === "unstitched" ? "Unstitched Fabric (0.8m)" : item.blouseOption === "standard" ? "Standard Stitching (+₹1,500)" : "Custom Bridal Tailoring (+₹2,500)"}
+                            <span className="text-stone-400">Blouse Piece:</span>
+                            <span className="font-semibold text-stone-800 bg-stone-100 px-2 py-0.5 rounded text-[11px]">
+                              Included (0.8m Matching Fabric)
                             </span>
                           </div>
 
@@ -249,33 +296,83 @@ export default function CartPage() {
                     Order Summary
                   </h3>
 
-                  {/* Promo Code Input */}
-                  <form onSubmit={handleApplyCoupon} className="mt-4 pb-4 border-b border-stone-200">
-                    <label className="block text-xs uppercase tracking-wider font-bold text-stone-700 mb-2">
+                  {/* Promo Code Input / Applied Badge */}
+                  <div className="mt-4 pb-4 border-b border-stone-200 space-y-3">
+                    <label className="block text-xs uppercase tracking-wider font-bold text-stone-700">
                       Privilege / Promo Code
                     </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="e.g. ROYAL10"
-                        value={couponCode}
-                        onChange={(e) => setCouponCode(e.target.value)}
-                        className="flex-1 bg-[#F4EFE6] border border-stone-300 rounded-xl px-3 py-2.5 text-xs font-mono uppercase focus:outline-none focus:border-[#3E0C15]"
-                      />
-                      <button
-                        type="submit"
-                        className="px-5 py-2.5 bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] text-xs font-bold rounded-xl transition-all cursor-pointer shadow"
-                      >
-                        Apply
-                      </button>
-                    </div>
-                    {couponError && <p className="text-[11px] text-rose-600 mt-1.5">{couponError}</p>}
-                    {appliedDiscount > 0 && (
-                      <p className="text-[11px] text-emerald-600 mt-1.5 flex items-center gap-1 font-semibold">
-                        <Sparkles className="w-3.5 h-3.5" /> Voucher Code Applied Successfully!
-                      </p>
+
+                    {appliedCoupon ? (
+                      <div className="p-3 bg-emerald-50/90 border border-emerald-300 rounded-2xl flex items-center justify-between gap-3 animate-in fade-in">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                            <Sparkles className="w-4 h-4 text-emerald-600" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono text-xs font-bold text-emerald-950 uppercase">{appliedCoupon.code}</span>
+                              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-200/80 px-1.5 py-0.5 rounded">
+                                Saved ₹{discountAmount.toLocaleString("en-IN")}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-emerald-800 font-medium leading-tight mt-0.5">{appliedCoupon.description}</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemoveCoupon}
+                          className="p-1.5 rounded-lg text-emerald-800 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer shrink-0"
+                          title="Remove Coupon"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <form onSubmit={handleApplyCoupon} className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="e.g. ROYAL10"
+                            value={couponCode}
+                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                            className="flex-1 bg-[#F4EFE6] border border-stone-300 rounded-xl px-3 py-2.5 text-xs font-mono uppercase font-bold focus:outline-none focus:border-[#3E0C15]"
+                          />
+                          <button
+                            type="submit"
+                            disabled={applying || !couponCode.trim()}
+                            className="px-5 py-2.5 bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] text-xs font-bold rounded-xl transition-all cursor-pointer shadow disabled:opacity-50 flex items-center justify-center gap-1.5"
+                          >
+                            {applying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Apply"}
+                          </button>
+                        </form>
+                        {couponError && <p className="text-[11px] text-rose-600 font-medium">{couponError}</p>}
+                      </>
                     )}
-                  </form>
+
+                    {/* Available Promo Badges for 1-Tap Apply */}
+                    {!appliedCoupon && availableOffers.length > 0 && (
+                      <div className="pt-1 space-y-1.5">
+                        <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider block">
+                          Available Privilege Codes:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {availableOffers.map((offer) => (
+                            <button
+                              key={offer.code}
+                              type="button"
+                              onClick={() => handleApplyDirect(offer)}
+                              className="text-[11px] font-mono font-bold bg-amber-100 hover:bg-amber-200 text-[#3E0C15] px-2 py-1 rounded-lg border border-amber-300 transition-colors cursor-pointer flex items-center gap-1"
+                            >
+                              <span>{offer.code}</span>
+                              <span className="font-sans font-normal text-[10px] text-amber-900">
+                                ({offer.type === "percentage" ? `${offer.value}% off` : `₹${Number(offer.value).toLocaleString("en-IN")} off`})
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Financial Breakdown (Subtotal, Discount, Shipping, Total) */}
                   <div className="space-y-3 pt-4 text-xs sm:text-sm">
@@ -285,8 +382,11 @@ export default function CartPage() {
                     </div>
 
                     {discountAmount > 0 && (
-                      <div className="flex justify-between text-emerald-700 font-semibold">
-                        <span>Discount Savings</span>
+                      <div className="flex justify-between text-emerald-700 font-bold">
+                        <span className="flex items-center gap-1">
+                          <Tag className="w-3.5 h-3.5" />
+                          <span>Privilege Savings ({appliedCoupon?.code})</span>
+                        </span>
                         <span>-₹{discountAmount.toLocaleString("en-IN")}</span>
                       </div>
                     )}

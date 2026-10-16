@@ -26,22 +26,36 @@ import {
   Home,
   Briefcase,
   Gift,
-  Loader2
+  Loader2,
+  Tag,
+  X
 } from "lucide-react";
 import { useCartWishlist } from "@/context/CartWishlistContext";
 import { useAuth } from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { calculateCouponDiscount } from "@/lib/promotions";
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { cart, cartSubtotal, clearCart } = useCartWishlist();
+  const { cart, cartSubtotal, clearCart, appliedCoupon, applyCoupon, removeCoupon } = useCartWishlist();
   const { user, loading: authLoading } = useAuth();
 
   // 4-Step Checkout Flow: 1. Address -> 2. Delivery -> 3. Payment -> 4. Confirmation
   const [currentStep, setCurrentStep] = useState(1);
+
+  // Coupon inline state in checkout
+  const [couponInput, setCouponInput] = useState(appliedCoupon?.code || "");
+  const [couponMsg, setCouponMsg] = useState({ type: "", text: "" });
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
+
+  useEffect(() => {
+    if (appliedCoupon?.code) {
+      setCouponInput(appliedCoupon.code);
+    }
+  }, [appliedCoupon]);
 
   // Address dynamic states
   const [savedAddresses, setSavedAddresses] = useState([]);
@@ -64,11 +78,57 @@ export default function CheckoutPage() {
   // Step 2: Delivery Method
   const [deliveryOption, setDeliveryOption] = useState("express"); // "express" (Free) | "vip" (+₹999)
 
-  // Step 3: Payment Method
+  // Step 3: Payment Method & Dynamic COD Store Setting from Admin Panel
   const [paymentMethod, setPaymentMethod] = useState("razorpay"); // "razorpay" (Online) | "cod" (Cash on Delivery)
+  const [codEnabled, setCodEnabled] = useState(true);
   const [upiId, setUpiId] = useState("");
 
   const [loading, setLoading] = useState(false);
+
+  // Dynamic Real-time Sync with Admin Settings (COD Toggle from /admin/settings)
+  useEffect(() => {
+    let isMounted = true;
+
+    // 1. Initial check from localStorage cache
+    try {
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem("suratbazar_store_config");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (typeof parsed.codEnabled === "boolean" && isMounted) {
+            setCodEnabled(parsed.codEnabled);
+            if (!parsed.codEnabled && paymentMethod === "cod") {
+              setPaymentMethod("razorpay");
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 2. Real-time Firestore onSnapshot subscription
+    try {
+      const docRef = doc(db, "settings", "store_config");
+      const unsubscribe = onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists() && isMounted) {
+          const data = docSnap.data();
+          const isEnabled = typeof data.codEnabled === "boolean" ? data.codEnabled : true;
+          setCodEnabled(isEnabled);
+          if (!isEnabled) {
+            setPaymentMethod((curr) => (curr === "cod" ? "razorpay" : curr));
+          }
+        }
+      }, (err) => {
+        console.warn("Notice: Live store_config listener:", err);
+      });
+
+      return () => {
+        isMounted = false;
+        unsubscribe();
+      };
+    } catch (e) {
+      console.warn("Could not attach store_config listener:", e);
+    }
+  }, []);
 
   // Helper to load Razorpay Checkout SDK dynamically if not yet ready
   const loadRazorpayScript = () => {
@@ -170,10 +230,32 @@ export default function CheckoutPage() {
     };
   }, [user, authLoading]);
 
-  // Financial Calculations
-  const discount = Math.round(cartSubtotal * 0.1); // ROYAL10 default discount
+  // Dynamic Financial Calculations from Admin Coupons
+  const discount = appliedCoupon ? calculateCouponDiscount(appliedCoupon, cartSubtotal) : 0;
   const deliveryFee = deliveryOption === "vip" ? 999 : 0;
   const finalTotal = Math.max(0, cartSubtotal - discount + deliveryFee);
+
+  const handleApplyCheckoutCoupon = async (e) => {
+    if (e) e.preventDefault();
+    if (!couponInput.trim()) return;
+
+    setApplyingCoupon(true);
+    setCouponMsg({ type: "", text: "" });
+    const res = await applyCoupon(couponInput, cartSubtotal);
+    setApplyingCoupon(false);
+
+    if (res.success) {
+      setCouponMsg({ type: "success", text: `Applied! Saved ₹${res.discount.toLocaleString("en-IN")}` });
+    } else {
+      setCouponMsg({ type: "error", text: res.error || "Invalid coupon code." });
+    }
+  };
+
+  const handleRemoveCheckoutCoupon = () => {
+    removeCoupon();
+    setCouponInput("");
+    setCouponMsg({ type: "", text: "" });
+  };
 
   const handleSelectSavedAddress = (addr) => {
     setSelectedAddressId(addr.id);
@@ -292,6 +374,12 @@ export default function CheckoutPage() {
 
     // 1. CASH ON DELIVERY (COD)
     if (paymentMethod === "cod") {
+      if (!codEnabled) {
+        alert("Cash on Delivery (COD) has been disabled by store management. Please proceed with Razorpay Online Checkout.");
+        setPaymentMethod("razorpay");
+        setLoading(false);
+        return;
+      }
       try {
         const orderData = {
           id: orderId,
@@ -306,9 +394,14 @@ export default function CheckoutPage() {
             blouseOption: item.blouseOption || 'unstitched',
             image: (item.images && item.images.length > 0) ? item.images[0] : (item.image || '')
           })),
+          subtotal: cartSubtotal,
+          discount: discount,
+          couponCode: appliedCoupon?.code || null,
+          deliveryFee: deliveryFee,
           totalAmount: finalTotal,
           paymentMethod: "Cash on Delivery",
-          paymentStatus: "Pending",
+          paymentStatus: "Pending (Pay on Delivery)",
+          isOnlinePayment: false,
           status: "Pending",
           date: new Date().toLocaleString("en-IN", { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }),
           createdAt: serverTimestamp(),
@@ -370,7 +463,7 @@ export default function CheckoutPage() {
 
       // Step B: Configure and open Razorpay popup modal
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || orderRes.keyId || "rzp_test_TnLGSops1YOO5n",
+        key: orderRes.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_live_ToZUxsu1jlHKm6",
         amount: orderRes.amount,
         currency: orderRes.currency || "INR",
         name: "Surat Bazar",
@@ -405,7 +498,7 @@ export default function CheckoutPage() {
               return;
             }
 
-            // Step D: Payment Verified -> Save order to Firestore
+            // Step D: Payment Verified -> Save order to Firestore ONLY after verified payment
             const orderData = {
               id: orderId,
               razorpayOrderId: response.razorpay_order_id,
@@ -422,9 +515,14 @@ export default function CheckoutPage() {
                 blouseOption: item.blouseOption || 'unstitched',
                 image: (item.images && item.images.length > 0) ? item.images[0] : (item.image || '')
               })),
+              subtotal: cartSubtotal,
+              discount: discount,
+              couponCode: appliedCoupon?.code || null,
+              deliveryFee: deliveryFee,
               totalAmount: finalTotal,
-              paymentMethod: "Razorpay (Online Payment)",
+              paymentMethod: "Online (Razorpay)",
               paymentStatus: "Paid",
+              isOnlinePayment: true,
               status: "Confirmed",
               date: new Date().toLocaleString("en-IN", { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }),
               createdAt: serverTimestamp(),
@@ -456,6 +554,7 @@ export default function CheckoutPage() {
         modal: {
           ondismiss: function () {
             setLoading(false);
+            alert("Payment was cancelled or closed. Your order was NOT placed and no money was deducted. You can retry payment or select Cash on Delivery.");
           },
         },
       };
@@ -463,7 +562,8 @@ export default function CheckoutPage() {
       const rzpInstance = new window.Razorpay(options);
       rzpInstance.on("payment.failed", function (failResp) {
         setLoading(false);
-        alert("Payment was declined or cancelled: " + (failResp.error?.description || "Transaction failed"));
+        const reason = failResp.error?.description || "Transaction failed";
+        alert("Payment was declined or cancelled: " + reason + ". Your order was NOT placed.");
       });
       rzpInstance.open();
     } catch (err) {
@@ -1055,37 +1155,64 @@ export default function CheckoutPage() {
                       </div>
                     </div>
 
-                    {/* 2. Cash on Delivery (COD) */}
-                    <div 
-                      onClick={() => setPaymentMethod("cod")}
-                      className={`p-5 rounded-2xl border-2 cursor-pointer transition-all ${
-                        paymentMethod === "cod" 
-                          ? "border-[#3E0C15] bg-[#3E0C15]/5 ring-2 ring-[#3E0C15]/20 shadow-sm" 
-                          : "border-stone-200 bg-stone-50 hover:border-stone-300"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${paymentMethod === "cod" ? "bg-[#3E0C15] text-[#F7EFCF]" : "bg-stone-200 text-stone-700"}`}>
-                            <Banknote className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-sm text-stone-900">Cash on Delivery (COD)</span>
-                              <span className="text-[10px] uppercase font-bold tracking-wider text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full">
-                                Pay at Doorstep
-                              </span>
+                    {/* 2. Cash on Delivery (COD) - Dynamically toggled from Admin Settings */}
+                    {codEnabled ? (
+                      <div 
+                        onClick={() => setPaymentMethod("cod")}
+                        id="checkout-payment-cod-option"
+                        className={`p-5 rounded-2xl border-2 cursor-pointer transition-all ${
+                          paymentMethod === "cod" 
+                            ? "border-[#3E0C15] bg-[#3E0C15]/5 ring-2 ring-[#3E0C15]/20 shadow-sm" 
+                            : "border-stone-200 bg-stone-50 hover:border-stone-300"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${paymentMethod === "cod" ? "bg-[#3E0C15] text-[#F7EFCF]" : "bg-stone-200 text-stone-700"}`}>
+                              <Banknote className="w-5 h-5" />
                             </div>
-                            <p className="text-xs text-stone-600 mt-1">
-                              Pay with cash or UPI QR directly to the courier agent when your package arrives.
-                            </p>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm text-stone-900">Cash on Delivery (COD)</span>
+                                <span className="text-[10px] uppercase font-bold tracking-wider text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full">
+                                  Pay at Doorstep
+                                </span>
+                              </div>
+                              <p className="text-xs text-stone-600 mt-1">
+                                Pay with cash or UPI QR directly to the courier agent when your package arrives.
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-1 ${paymentMethod === "cod" ? "border-[#3E0C15] bg-[#3E0C15]" : "border-stone-300"}`}>
-                          {paymentMethod === "cod" && <div className="w-2 h-2 rounded-full bg-white" />}
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-1 ${paymentMethod === "cod" ? "border-[#3E0C15] bg-[#3E0C15]" : "border-stone-300"}`}>
+                            {paymentMethod === "cod" && <div className="w-2 h-2 rounded-full bg-white" />}
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div 
+                        id="checkout-payment-cod-disabled"
+                        className="p-5 rounded-2xl border border-dashed border-stone-300 bg-stone-100/70 opacity-80 cursor-not-allowed select-none"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-stone-200 text-stone-400">
+                              <Banknote className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm text-stone-500 line-through">Cash on Delivery (COD)</span>
+                                <span className="text-[10px] uppercase font-bold tracking-wider text-stone-600 bg-stone-200 px-2.5 py-0.5 rounded-full">
+                                  Temporarily Unavailable
+                                </span>
+                              </div>
+                              <p className="text-xs text-stone-500 mt-1">
+                                Cash on Delivery is currently turned OFF by store management. Please proceed securely via Razorpay Online Payment (UPI, Cards, NetBanking).
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-4 flex items-center justify-between">
@@ -1145,7 +1272,7 @@ export default function CheckoutPage() {
                         <button onClick={() => setCurrentStep(3)} className="text-amber-800 underline font-semibold">Edit</button>
                       </div>
                       <p className="text-stone-700 font-semibold">
-                        {paymentMethod === "razorpay" 
+                        {paymentMethod === "razorpay" || !codEnabled
                           ? "Razorpay Online (Instant UPI, Cards, NetBanking)" 
                           : "Cash on Delivery (Pay at Doorstep)"}
                       </p>
@@ -1170,12 +1297,12 @@ export default function CheckoutPage() {
                       {loading ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>{paymentMethod === "razorpay" ? "Opening Razorpay..." : "Placing Order..."}</span>
+                          <span>{paymentMethod === "razorpay" || !codEnabled ? "Opening Razorpay..." : "Placing Order..."}</span>
                         </>
                       ) : (
                         <>
                           <span>
-                            {paymentMethod === "razorpay" 
+                            {paymentMethod === "razorpay" || !codEnabled
                               ? `Pay ₹${finalTotal.toLocaleString("en-IN")} via Razorpay` 
                               : "Confirm & Place COD Order"}
                           </span>
@@ -1200,8 +1327,7 @@ export default function CheckoutPage() {
                 {/* Items preview list */}
                 <div className="max-h-60 overflow-y-auto divide-y divide-stone-100 my-4 pr-1">
                   {cart.map((item, idx) => {
-                    const blousePrice = item.blouseOption === "standard" ? 1500 : item.blouseOption === "custom" ? 2500 : 0;
-                    const itemUnitPrice = item.price + blousePrice;
+                    const itemUnitPrice = item.price;
 
                     return (
                       <div key={idx} className="py-3 flex items-center gap-3 text-xs">
@@ -1210,12 +1336,65 @@ export default function CheckoutPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <h4 className="font-semibold text-stone-900 truncate">{item.name}</h4>
-                          <span className="text-stone-500 text-[11px] block">{item.blouseOption} • Qty {item.quantity}</span>
+                          <span className="text-stone-500 text-[11px] block">Qty {item.quantity}</span>
                           <span className="font-bold text-[#3E0C15]">₹{(itemUnitPrice * item.quantity).toLocaleString("en-IN")}</span>
                         </div>
                       </div>
                     );
                   })}
+                </div>
+
+                {/* Financial Summary */}
+                {/* Coupon Code Box */}
+                <div className="pt-3 border-t border-stone-100">
+                  {appliedCoupon ? (
+                    <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-300 flex items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono font-bold text-emerald-950 uppercase">{appliedCoupon.code}</span>
+                            <span className="text-[10px] bg-emerald-200/80 text-emerald-800 font-bold px-1.5 py-0.5 rounded">
+                              Saved ₹{discount.toLocaleString("en-IN")}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-emerald-700 leading-tight mt-0.5">{appliedCoupon.description}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveCheckoutCoupon}
+                        className="p-1 rounded-md text-emerald-800 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer shrink-0"
+                        title="Remove Coupon"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <form onSubmit={handleApplyCheckoutCoupon} className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Privilege Code (e.g. ROYAL10)"
+                          value={couponInput}
+                          onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                          className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:border-[#3E0C15]"
+                        />
+                        <button
+                          type="submit"
+                          disabled={applyingCoupon || !couponInput.trim()}
+                          className="px-4 py-2 bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] text-xs font-bold rounded-xl transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center"
+                        >
+                          {applyingCoupon ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Apply"}
+                        </button>
+                      </form>
+                      {couponMsg.text && (
+                        <p className={`text-[11px] font-medium ${couponMsg.type === "error" ? "text-rose-600" : "text-emerald-700"}`}>
+                          {couponMsg.text}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Financial Summary */}
@@ -1225,8 +1404,11 @@ export default function CheckoutPage() {
                     <span className="font-semibold text-stone-900">₹{cartSubtotal.toLocaleString("en-IN")}</span>
                   </div>
                   {discount > 0 && (
-                    <div className="flex justify-between text-emerald-700 font-semibold">
-                      <span>ROYAL10 Privilege Discount</span>
+                    <div className="flex justify-between text-emerald-700 font-bold">
+                      <span className="flex items-center gap-1">
+                        <Tag className="w-3.5 h-3.5" />
+                        <span>Privilege Discount ({appliedCoupon?.code || "Promo"})</span>
+                      </span>
                       <span>-₹{discount.toLocaleString("en-IN")}</span>
                     </div>
                   )}

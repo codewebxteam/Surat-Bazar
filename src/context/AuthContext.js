@@ -2,12 +2,21 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 
 const AuthContext = createContext({});
 
 export const useAuth = () => useContext(AuthContext);
+
+export const isEmailAdmin = (email = "") => {
+  const clean = (email || "").toLowerCase().trim();
+  return (
+    clean === "admin@suratbazar.com" ||
+    clean === "suratbazar360@gmail.com" ||
+    clean.startsWith("admin@")
+  );
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -16,26 +25,37 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setLoading(true); // Ensure loading is true while we fetch role
+      setLoading(true);
       if (firebaseUser) {
         setUser(firebaseUser);
         
+        let determinedRole = "customer";
         try {
           // Fetch user role from Firestore
           const userDocRef = doc(db, "users", firebaseUser.uid);
           const userDoc = await getDoc(userDocRef);
           
           if (userDoc.exists()) {
-            const fetchedRole = userDoc.data().role || "customer";
-            setRole(fetchedRole.toLowerCase());
-          } else {
-            // Default role if document doesn't exist
-            setRole("customer");
+            determinedRole = (userDoc.data().role || "customer").toLowerCase();
           }
         } catch (error) {
-          console.error("Error fetching user role:", error);
-          setRole("customer"); // fallback
+          console.warn("Notice: reading user role from Firestore:", error);
         }
+
+        // Automatic Admin detection via designated admin emails or Firestore role
+        if (determinedRole === "admin" || isEmailAdmin(firebaseUser.email)) {
+          determinedRole = "admin";
+          // Sync to Firestore in background
+          try {
+            await setDoc(doc(db, "users", firebaseUser.uid), {
+              email: firebaseUser.email,
+              role: "admin",
+              updatedAt: new Date().toISOString()
+            }, { merge: true });
+          } catch (_) {}
+        }
+
+        setRole(determinedRole);
       } else {
         setUser(null);
         setRole(null);

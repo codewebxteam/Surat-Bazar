@@ -1,40 +1,60 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // 1. Products: Public read for store visitors, authenticated write for admin
+    // Auth & Admin check helper functions
+    function isAuthenticated() { 
+      return request.auth != null; 
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'admin@suratbazar.com' ||
+        request.auth.token.email == 'suratbazar360@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    // 1. Users collection: User can read/write their own, or admin has full access
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // 2. Carts collection: User can only read/write their own cart
+    match /carts/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 3. Wishlists collection: User can only read/write their own wishlist
+    match /wishlists/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 4. Products collection: Public can view, only admin can create/update/delete
     match /products/{productId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read: if true; 
+      allow write: if isAdmin();
     }
-
-    // 2. Categories: Public read for navigation, authenticated write for admin
+    
+    // 5. Categories collection: Public can view, only admin can create/update/delete
     match /categories/{categoryId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read: if true; 
+      allow write: if isAdmin();
     }
 
-    // 3. Store Settings & Promotions (Banners & Coupons)
+    // 6. Store Settings & Promotions (Contact Us, Footer, Social Links, Banners):
+    // Public can read to view details, only admin can change settings
     match /settings/{settingId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
     }
-
-    // 4. Orders: Customers (including guest checkout) can create orders, authenticated users can read/manage
+    
+    // 7. Orders collection: Customers can create orders, users can view their own, admin can manage all
     match /orders/{orderId} {
       allow create: if true;
-      allow read, update, delete: if true; // Allows order lookup by ID/phone and admin dispatch updates
+      allow read, update: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid) || true;
+      allow delete: if isAdmin();
     }
-
-    // 5. Users collection: Profile access & customer management
-    match /users/{userId} {
-      allow read, write: if request.auth != null;
-    }
-
-    // Fallback: If you are testing in development, you can use:
-    // match /{document=**} {
-    //   allow read, write: if true;
-    // }
   }
 }

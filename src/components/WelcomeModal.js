@@ -15,8 +15,10 @@ import {
   MessageCircle,
   UserCheck
 } from "lucide-react";
+import { useStoreConfig } from "@/context/StoreConfigContext";
 
 export default function WelcomeModal() {
+  const { config } = useStoreConfig();
   const [isOpen, setIsOpen] = useState(false);
   const [userData, setUserData] = useState(null);
   const router = useRouter();
@@ -229,7 +231,7 @@ export default function WelcomeModal() {
                     VIP Concierge Support
                   </h4>
                   <p className="text-xs text-stone-600 mt-0.5 leading-snug">
-                    Direct WhatsApp assistance for styling & custom drape inquiries at +91 82002 60300.
+                    Direct WhatsApp assistance for styling & custom drape inquiries at {config.contact?.whatsapp || config.contact?.phone || "+91 82002 60300"}.
                   </p>
                 </div>
               </div>

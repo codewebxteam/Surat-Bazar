@@ -42,7 +42,7 @@ export default function AdminCategoriesPage() {
       const catData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCategories(catData);
     } catch (error) {
-      console.error("Error fetching categories:", error);
+      console.warn("Notice: Fetching categories from Firestore:", error?.message || error);
     } finally {
       setLoading(false);
     }
@@ -99,8 +99,8 @@ export default function AdminCategoriesPage() {
       setTimeout(() => setSuccessMessage(false), 3000);
       fetchCategories();
     } catch (error) {
-      console.error("Error adding category:", error);
-      alert("Failed to add category.");
+      console.warn("Notice: Adding category:", error?.message || error);
+      alert("Failed to add category: " + (error?.message || "Check Firestore permissions"));
     } finally {
       setIsSubmitting(false);
     }
@@ -112,7 +112,7 @@ export default function AdminCategoriesPage() {
         await deleteDoc(doc(db, "categories", id));
         setCategories(categories.filter(c => c.id !== id));
       } catch (error) {
-        console.error("Error deleting category:", error);
+        console.warn("Notice: Deleting category:", error?.message || error);
       }
     }
   };

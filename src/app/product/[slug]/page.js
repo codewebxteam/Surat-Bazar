@@ -40,6 +40,7 @@ import Footer from "@/components/Footer";
 import ProductCard from "@/components/ProductCard";
 import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { getPromotionsData, DEFAULT_COUPONS } from "@/lib/promotions";
 
 export default function ProductDetailPage({ params }) {
   const unwrappedParams = use(params);
@@ -75,8 +76,28 @@ export default function ProductDetailPage({ params }) {
     fetchProductData();
   }, [slug]);
 
-  const { addToCart, toggleWishlist, isInWishlist } = useCartWishlist();
+  const { addToCart, toggleWishlist, isInWishlist, appliedCoupon, applyCoupon } = useCartWishlist();
   const wishlisted = product ? isInWishlist(product.id) : false;
+
+  // Dynamic offers from Admin Settings / Promotions
+  const [activeOffers, setActiveOffers] = useState(DEFAULT_COUPONS.filter(c => c.isActive));
+
+  useEffect(() => {
+    async function loadDynamicOffers() {
+      try {
+        const data = await getPromotionsData();
+        if (data && Array.isArray(data.coupons)) {
+          const live = data.coupons.filter(c => c.isActive);
+          if (live.length > 0) {
+            setActiveOffers(live);
+          }
+        }
+      } catch (e) {
+        console.warn("Could not load dynamic offers on product page:", e);
+      }
+    }
+    loadDynamicOffers();
+  }, []);
 
   // Gallery States
   const [selectedImage, setSelectedImage] = useState(0);
@@ -153,13 +174,7 @@ export default function ProductDetailPage({ params }) {
 
   const savingsAmount = product.originalPrice ? product.originalPrice - product.price : 0;
 
-  const blousePrices = {
-    unstitched: 0,
-    standard: 1500,
-    custom: 2500,
-  };
-
-  const currentPrice = product.price + blousePrices[blouseOption];
+  const currentPrice = product.price;
 
   // Zoom Mouse Movement Handler (Desktop)
   const handleMouseMove = (e) => {
@@ -185,11 +200,19 @@ export default function ProductDetailPage({ params }) {
     }
   };
 
-  const handleCopyPromo = (code) => {
+  const handleCopyPromo = async (offer) => {
+    const code = typeof offer === "string" ? offer : offer.code;
     if (navigator.clipboard) {
       navigator.clipboard.writeText(code);
-      setCopiedPromo(code);
-      setTimeout(() => setCopiedPromo(null), 2500);
+    }
+    setCopiedPromo(code);
+    setTimeout(() => setCopiedPromo(null), 3000);
+
+    // Apply to cart session if eligible
+    if (typeof offer === "object" && offer !== null && offer.type !== "info") {
+      await applyCoupon(offer);
+    } else if (typeof offer === "string") {
+      await applyCoupon(code);
     }
   };
 
@@ -445,7 +468,7 @@ export default function ProductDetailPage({ params }) {
                     </span>
                     {product.originalPrice && (
                       <span className="text-xs sm:text-base text-stone-400 line-through">
-                        ₹{(product.originalPrice + blousePrices[blouseOption]).toLocaleString("en-IN")}
+                        ₹{product.originalPrice.toLocaleString("en-IN")}
                       </span>
                     )}
                     {discountPercent > 0 && (
@@ -465,46 +488,66 @@ export default function ProductDetailPage({ params }) {
                 </span>
               </div>
 
-              {/* Exclusive Member & Bank Offers Box (with 1-Tap Copy) */}
-              <div className="p-3.5 sm:p-4 rounded-2xl bg-amber-50/80 border border-amber-300/60 space-y-2.5">
-                <div className="flex items-center gap-2 text-xs font-bold text-[#3E0C15] uppercase tracking-wider">
-                  <Tag className="w-3.5 h-3.5 text-amber-700" />
-                  <span>Available Offers & Privileges</span>
+              {/* Exclusive Member & Bank Offers Box (Dynamic from Admin) */}
+              {activeOffers && activeOffers.length > 0 && (
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-amber-50/80 border border-amber-300/60 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs font-bold text-[#3E0C15] uppercase tracking-wider">
+                    <div className="flex items-center gap-2">
+                      <Tag className="w-3.5 h-3.5 text-amber-700" />
+                      <span>Available Offers & Privileges</span>
+                    </div>
+                    {appliedCoupon && (
+                      <span className="text-[10px] text-emerald-800 font-bold bg-emerald-100 px-2 py-0.5 rounded-full lowercase tracking-normal">
+                        code {appliedCoupon.code} active
+                      </span>
+                    )}
+                  </div>
+                  
+                  <ul className="space-y-2 text-xs text-stone-700">
+                    {activeOffers.map((offer, idx) => {
+                      const isApplied = appliedCoupon?.code === offer.code;
+                      const isCopied = copiedPromo === offer.code;
+
+                      if (offer.type === "info") {
+                        return (
+                          <li key={offer.code + idx} className="flex items-start gap-2">
+                            <span className="font-mono font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded text-[10px] shrink-0">
+                              {offer.code}
+                            </span>
+                            <span className="text-[11px] sm:text-xs text-stone-700">{offer.description}</span>
+                          </li>
+                        );
+                      }
+
+                      return (
+                        <li key={offer.code + idx} className="flex items-center justify-between gap-2">
+                          <div className="flex items-start gap-2">
+                            <span className="font-mono font-bold text-[#3E0C15] bg-amber-200/90 px-1.5 py-0.5 rounded text-[10px] shrink-0">
+                              {offer.code}
+                            </span>
+                            <span className="text-[11px] sm:text-xs text-stone-700">
+                              {offer.description}
+                            </span>
+                          </div>
+                          <button 
+                            type="button"
+                            onClick={() => handleCopyPromo(offer)} 
+                            className={`text-[10px] font-bold px-2.5 py-1 rounded-md transition-all shrink-0 cursor-pointer ${
+                              isApplied
+                                ? "bg-emerald-700 text-white shadow-xs"
+                                : isCopied
+                                ? "bg-amber-400 text-[#3E0C15] font-extrabold"
+                                : "text-amber-900 bg-amber-200/70 hover:bg-amber-300"
+                            }`}
+                          >
+                            {isApplied ? "Applied ✓" : isCopied ? "Copied ✓" : "Apply"}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
-                
-                <ul className="space-y-2 text-xs text-stone-700">
-                  <li className="flex items-center justify-between gap-2">
-                    <div className="flex items-start gap-2">
-                      <span className="font-mono font-bold text-[#3E0C15] bg-amber-200/90 px-1.5 py-0.5 rounded text-[10px] shrink-0">ROYAL10</span>
-                      <span className="text-[11px] sm:text-xs">Flat 10% instant off on orders above ₹15,000.</span>
-                    </div>
-                    <button 
-                      onClick={() => handleCopyPromo("ROYAL10")} 
-                      className="text-[10px] font-bold text-amber-900 bg-amber-200/60 hover:bg-amber-300 px-2 py-1 rounded transition-colors shrink-0 cursor-pointer"
-                    >
-                      {copiedPromo === "ROYAL10" ? "Copied ✓" : "Copy"}
-                    </button>
-                  </li>
-                  
-                  <li className="flex items-center justify-between gap-2">
-                    <div className="flex items-start gap-2">
-                      <span className="font-mono font-bold text-[#3E0C15] bg-amber-200/90 px-1.5 py-0.5 rounded text-[10px] shrink-0">SAREECLUB</span>
-                      <span className="text-[11px] sm:text-xs">₹2,000 welcome credit for registered Saree Club members.</span>
-                    </div>
-                    <button 
-                      onClick={() => handleCopyPromo("SAREECLUB")} 
-                      className="text-[10px] font-bold text-amber-900 bg-amber-200/60 hover:bg-amber-300 px-2 py-1 rounded transition-colors shrink-0 cursor-pointer"
-                    >
-                      {copiedPromo === "SAREECLUB" ? "Copied ✓" : "Copy"}
-                    </button>
-                  </li>
-                  
-                  <li className="flex items-start gap-2">
-                    <span className="font-mono font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded text-[10px] shrink-0">NO COST EMI</span>
-                    <span className="text-[11px] sm:text-xs">Zero interest monthly installments starting from ₹2,100/mo.</span>
-                  </li>
-                </ul>
-              </div>
+              )}
 
               {/* Color / Variant Swatch Selector */}
               <div>
@@ -531,46 +574,6 @@ export default function ProductDetailPage({ params }) {
                 </div>
               </div>
 
-              {/* Blouse Customization Option (Responsive Grid) */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs uppercase tracking-wider font-bold text-stone-900">
-                    Blouse Customization Options:
-                  </label>
-                  <span className="text-[11px] text-amber-800 font-medium">Bespoke Tailoring</span>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-                  {[
-                    { id: "unstitched", label: "Unstitched Fabric", extra: "Included (0.8m)", tag: "Free" },
-                    { id: "standard", label: "Standard Tailoring", extra: "+₹1,500", tag: "3-4 Days" },
-                    { id: "custom", label: "Bridal Bespoke Stitch", extra: "+₹2,500", tag: "Hand Finished" },
-                  ].map((opt) => (
-                    <button
-                      key={opt.id}
-                      onClick={() => setBlouseOption(opt.id)}
-                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex sm:flex-col justify-between sm:justify-start items-center sm:items-start ${
-                        blouseOption === opt.id
-                          ? "border-[#3E0C15] bg-white shadow-md ring-2 ring-[#3E0C15]/20"
-                          : "border-stone-200 bg-stone-50 hover:bg-white text-stone-700"
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-stone-900">{opt.label}</span>
-                          {blouseOption === opt.id && <Check className="w-3.5 h-3.5 text-[#3E0C15] sm:hidden" />}
-                        </div>
-                        <div className="text-[11px] text-amber-800 font-semibold mt-0.5">{opt.extra}</div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 sm:mt-1">
-                        <span className="text-[10px] text-stone-500 bg-stone-200/60 px-2 py-0.5 rounded-full">{opt.tag}</span>
-                        {blouseOption === opt.id && <Check className="w-3.5 h-3.5 text-[#3E0C15] hidden sm:inline" />}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
 
               {/* Quantity, Add to Bag & Buy Now CTAs (Desktop / Large View) */}
               <div className="space-y-3 pt-2">

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { 
   Search, 
-  Filter, 
   ShoppingBag, 
   Truck, 
   CheckCircle, 
@@ -15,15 +14,76 @@ import {
   Phone, 
   X,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  PackageCheck,
+  CreditCard,
+  Banknote,
+  ShieldCheck
 } from "lucide-react";
 import { collection, getDocs, doc, updateDoc, orderBy, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+
+// Milestone status constants matching the tracking page
+export const ORDER_STATUS_MILESTONES = [
+  "Order Placed & Confirmed",
+  "Quality Check & Artisan Packaging",
+  "Dispatched & Express Transit",
+  "Delivered to Doorstep",
+  "Cancelled"
+];
+
+// Helper to normalize any existing database status to milestone name
+export const canonicalStatus = (status = "") => {
+  const s = (status || "").toLowerCase().trim();
+  if (s.includes("cancel")) return "Cancelled";
+  if (s.includes("deliver")) return "Delivered to Doorstep";
+  if (s.includes("dispatch") || s.includes("transit")) return "Dispatched & Express Transit";
+  if (s.includes("quality") || s.includes("packag") || s.includes("process")) return "Quality Check & Artisan Packaging";
+  return "Order Placed & Confirmed";
+};
+
+// Helper: Online will ONLY be displayed when payment is verified & completed
+export const isOnlinePaid = (order) => {
+  if (!order) return false;
+  const payStatus = String(order.paymentStatus || "").toLowerCase();
+  const hasRzpId = Boolean(order.razorpayPaymentId);
+  return payStatus === "paid" || hasRzpId;
+};
+
+// Helper: Cash on Delivery (pending doorstep collection)
+export const isCod = (order) => {
+  if (!order) return false;
+  if (isOnlinePaid(order)) return false;
+  const payMethod = String(order.paymentMethod || "").toLowerCase();
+  const payStatus = String(order.paymentStatus || "").toLowerCase();
+  if (payMethod.includes("cash") || payMethod.includes("cod") || payStatus.includes("pending")) {
+    return true;
+  }
+  return true;
+};
+
+export const getStatusBadgeStyle = (status = "") => {
+  const s = (status || "").toLowerCase().trim();
+  if (s.includes("cancel")) {
+    return "bg-rose-100 text-rose-800 border-rose-300";
+  }
+  if (s.includes("deliver")) {
+    return "bg-emerald-100 text-emerald-800 border-emerald-300";
+  }
+  if (s.includes("dispatch") || s.includes("transit")) {
+    return "bg-sky-100 text-sky-800 border-sky-300";
+  }
+  if (s.includes("quality") || s.includes("packag") || s.includes("process")) {
+    return "bg-amber-100 text-amber-800 border-amber-300";
+  }
+  return "bg-purple-100 text-purple-800 border-purple-300";
+};
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all"); // "all" | "online" | "cod"
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [printWarning, setPrintWarning] = useState(false);
@@ -54,7 +114,7 @@ export default function AdminOrdersPage() {
 
       setOrders(fetchedOrders);
     } catch (error) {
-      console.error("Error fetching orders:", error);
+      console.warn("Notice: Fetching orders from Firestore:", error?.message || error);
     } finally {
       setLoading(false);
     }
@@ -70,41 +130,40 @@ export default function AdminOrdersPage() {
     const customer = (o.customer || o.shippingDetails?.name || "").toLowerCase();
     const phone = String(o.phone || o.shippingDetails?.mobile || "");
     const matchesSearch = !q || orderId.includes(q) || customer.includes(q) || phone.includes(q);
-    const orderStatus = (o.status || "").toLowerCase();
-    const matchesStatus = statusFilter === "all" || orderStatus === statusFilter.toLowerCase();
-    return matchesSearch && matchesStatus;
+    
+    if (!matchesSearch) return false;
+
+    // Filter by Payment Mode: Online (Paid) vs Cash on Delivery
+    if (paymentFilter === "online" && !isOnlinePaid(o)) return false;
+    if (paymentFilter === "cod" && !isCod(o)) return false;
+
+    if (statusFilter === "all") return true;
+
+    const normOrder = canonicalStatus(o.status);
+    const matchesStatus = normOrder.toLowerCase() === statusFilter.toLowerCase();
+    return matchesStatus;
   });
 
   const updateStatus = async (orderId, newStatus) => {
     try {
-      await updateDoc(doc(db, "orders", orderId), { status: newStatus });
+      await updateDoc(doc(db, "orders", orderId), { 
+        status: newStatus,
+        updatedAt: new Date().toISOString()
+      });
       setOrders(orders.map((o) => o.id === orderId ? { ...o, status: newStatus } : o));
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder({ ...selectedOrder, status: newStatus });
       }
     } catch (error) {
       console.error("Error updating status:", error);
-      alert("Failed to update status.");
+      alert("Failed to update status. Please check your network or permissions.");
     }
   };
 
-  const getStatusBadge = (status = "") => {
-    switch (status.toLowerCase()) {
-      case "delivered":
-        return "bg-emerald-100 text-emerald-800 border-emerald-200";
-      case "dispatched":
-        return "bg-sky-100 text-sky-800 border-sky-200";
-      case "processing":
-      case "confirmed":
-        return "bg-amber-100 text-amber-800 border-amber-200";
-      case "pending":
-        return "bg-purple-100 text-purple-800 border-purple-200";
-      case "cancelled":
-        return "bg-rose-100 text-rose-800 border-rose-200";
-      default:
-        return "bg-stone-100 text-stone-800 border-stone-200";
-    }
-  };
+  const activeFulfillmentCount = orders.filter(o => {
+    const s = (o.status || "").toLowerCase();
+    return !s.includes("deliver") && !s.includes("cancel");
+  }).length;
 
   return (
     <div className="space-y-6">
@@ -113,7 +172,7 @@ export default function AdminOrdersPage() {
         <div>
           <h1 className="font-serif text-2xl font-bold text-stone-900">Orders & Fulfillment</h1>
           <p className="text-xs text-stone-500 mt-1">
-            Track dispatches, print invoices, and update shipping statuses
+            Track dispatches, update delivery milestones, and issue tax invoices
           </p>
         </div>
 
@@ -126,52 +185,116 @@ export default function AdminOrdersPage() {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
-          <span className="px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold">
-            {orders.filter(o => (o.status || "").toLowerCase() === "pending" || (o.status || "").toLowerCase() === "processing" || (o.status || "").toLowerCase() === "confirmed").length} Orders to Ship
+          <span className="px-3.5 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold flex items-center gap-1.5">
+            <PackageCheck className="w-3.5 h-3.5 text-amber-700" />
+            <span>{activeFulfillmentCount} Active Shipments</span>
           </span>
         </div>
       </div>
 
-      {/* Search & Filter Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-amber-900/10 shadow-xs flex flex-col md:flex-row items-center gap-3 justify-between">
-        <div className="relative w-full md:w-80">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by Order ID, Customer name, Phone..."
-            className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-10 pr-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#C5832B]/50"
-          />
-        </div>
+      {/* Search & Milestone Filter Tabs */}
+      <div className="bg-white p-4 rounded-2xl border border-amber-900/10 shadow-xs space-y-3">
+        <div className="flex flex-col lg:flex-row items-center gap-3 justify-between">
+          <div className="relative w-full lg:w-80">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by Order ID, Customer name, Phone..."
+              className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-10 pr-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#C5832B]/50"
+            />
+          </div>
 
-        <div className="flex items-center gap-1.5 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-          {["all", "Pending", "Processing", "Dispatched", "Delivered"].map((st) => (
+          <div className="flex items-center gap-1.5 w-full lg:w-auto overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
             <button
-              key={st}
-              onClick={() => setStatusFilter(st)}
+              onClick={() => setStatusFilter("all")}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                statusFilter.toLowerCase() === st.toLowerCase()
+                statusFilter === "all"
                   ? "bg-[#571520] text-[#F3E5C8] shadow-xs"
                   : "bg-stone-100 text-stone-600 hover:bg-stone-200"
               }`}
             >
-              {st === "all" ? "All Orders" : st}
+              All Milestones ({orders.length})
             </button>
-          ))}
 
-          {(searchQuery.trim() !== "" || statusFilter !== "all") && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchQuery("");
-                setStatusFilter("all");
-              }}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 whitespace-nowrap transition-all cursor-pointer shadow-xs active:scale-95"
-            >
-              Clear All
-            </button>
-          )}
+            {ORDER_STATUS_MILESTONES.map((milestone) => {
+              const count = orders.filter(o => canonicalStatus(o.status).toLowerCase() === milestone.toLowerCase()).length;
+              const isSelected = statusFilter.toLowerCase() === milestone.toLowerCase();
+              return (
+                <button
+                  key={milestone}
+                  onClick={() => setStatusFilter(milestone)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                    isSelected
+                      ? "bg-[#571520] text-[#F3E5C8] shadow-xs"
+                      : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                  }`}
+                >
+                  <span>{milestone}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    isSelected ? "bg-[#3E0C15] text-[#E8C574]" : "bg-stone-200 text-stone-700"
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+
+            {(searchQuery.trim() !== "" || statusFilter !== "all" || paymentFilter !== "all") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setStatusFilter("all");
+                  setPaymentFilter("all");
+                }}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 whitespace-nowrap transition-all cursor-pointer shadow-xs active:scale-95"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Payment Mode Filter Tabs */}
+        <div className="flex flex-wrap items-center gap-2 pt-2.5 border-t border-stone-100 text-xs">
+          <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider mr-1">Filter Payment:</span>
+          <button
+            type="button"
+            onClick={() => setPaymentFilter("all")}
+            className={`px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+              paymentFilter === "all"
+                ? "bg-stone-900 text-white shadow-xs"
+                : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+            }`}
+          >
+            All Methods ({orders.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setPaymentFilter("online")}
+            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              paymentFilter === "online"
+                ? "bg-emerald-800 text-emerald-50 shadow-xs ring-2 ring-emerald-600/30"
+                : "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span>Online (Paid Only: {orders.filter(isOnlinePaid).length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setPaymentFilter("cod")}
+            className={`px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              paymentFilter === "cod"
+                ? "bg-amber-800 text-amber-50 shadow-xs ring-2 ring-amber-600/30"
+                : "bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100"
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+            <span>Cash on Delivery (COD: {orders.filter(isCod).length})</span>
+          </button>
         </div>
       </div>
 
@@ -184,8 +307,8 @@ export default function AdminOrdersPage() {
                 <th className="py-3.5 px-4">Order ID & Date</th>
                 <th className="py-3.5 px-4">Customer</th>
                 <th className="py-3.5 px-4">Saree Items</th>
-                <th className="py-3.5 px-4">Total Amount</th>
-                <th className="py-3.5 px-4">Status & Update</th>
+                <th className="py-3.5 px-4">Amount & Payment Mode</th>
+                <th className="py-3.5 px-4">Delivery Milestone (Update)</th>
                 <th className="py-3.5 px-4 text-right">Action</th>
               </tr>
             </thead>
@@ -210,6 +333,9 @@ export default function AdminOrdersPage() {
                   const phoneNum = order.phone || order.shippingDetails?.mobile || "N/A";
                   const total = Number(order.totalAmount) || 0;
                   const orderDate = order.date || (order.createdAt?.seconds ? new Date(order.createdAt.seconds * 1000).toLocaleDateString("en-IN") : "Recent");
+                  const currentMilestone = canonicalStatus(order.status);
+                  const isPaidOnline = isOnlinePaid(order);
+                  const isCashDelivery = isCod(order);
 
                   return (
                     <tr key={order.id} className="hover:bg-amber-50/20 transition-colors">
@@ -239,23 +365,45 @@ export default function AdminOrdersPage() {
                       </td>
 
                       <td className="py-3.5 px-4">
-                        <div className="font-bold text-stone-900">
+                        <div className="font-bold text-stone-900 text-sm">
                           ₹{total.toLocaleString("en-IN")}
                         </div>
-                        <div className="text-[10px] text-stone-400">{order.paymentMethod || "Online"}</div>
+                        <div className="mt-1">
+                          {isPaidOnline ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                              <span>Online (Paid)</span>
+                            </span>
+                          ) : isCashDelivery ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 shadow-xs">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                              <span>Cash on Delivery (COD)</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                              <span>Payment Incomplete</span>
+                            </span>
+                          )}
+                        </div>
+                        {order.razorpayPaymentId && (
+                          <div className="text-[10px] font-mono text-stone-400 mt-0.5 truncate max-w-[130px]" title={order.razorpayPaymentId}>
+                            ID: {order.razorpayPaymentId}
+                          </div>
+                        )}
                       </td>
 
+                      {/* Dropdown with Delivery Milestone Progress Options */}
                       <td className="py-3.5 px-4">
                         <select
-                          value={order.status || "Pending"}
+                          value={currentMilestone}
                           onChange={(e) => updateStatus(order.id, e.target.value)}
-                          className={`text-[11px] font-bold px-2.5 py-1 rounded-full border cursor-pointer focus:outline-none ${getStatusBadge(order.status)}`}
+                          className={`text-[11px] font-bold px-3 py-1.5 rounded-xl border cursor-pointer focus:outline-none transition-all shadow-xs ${getStatusBadgeStyle(order.status)}`}
                         >
-                          <option value="Pending">Pending</option>
-                          <option value="Processing">Processing</option>
-                          <option value="Dispatched">Dispatched</option>
-                          <option value="Delivered">Delivered</option>
-                          <option value="Cancelled">Cancelled</option>
+                          {ORDER_STATUS_MILESTONES.map((milestone) => (
+                            <option key={milestone} value={milestone} className="bg-white text-stone-900 py-1">
+                              {milestone}
+                            </option>
+                          ))}
                         </select>
                       </td>
 
@@ -302,6 +450,29 @@ export default function AdminOrdersPage() {
             </div>
 
             <div className="py-4 space-y-4 text-xs">
+              {/* Delivery Milestone Status in Details Modal */}
+              <div className="p-3 bg-stone-50 rounded-2xl border border-stone-200/80 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 block">Current Milestone</span>
+                  <span className={`inline-block mt-1 px-3 py-1 rounded-full text-xs font-bold border ${getStatusBadgeStyle(selectedOrder.status)}`}>
+                    {canonicalStatus(selectedOrder.status)}
+                  </span>
+                </div>
+                <div>
+                  <select
+                    value={canonicalStatus(selectedOrder.status)}
+                    onChange={(e) => updateStatus(selectedOrder.id, e.target.value)}
+                    className="text-xs font-bold px-3 py-1.5 rounded-xl border border-stone-300 bg-white text-stone-800 cursor-pointer focus:outline-none"
+                  >
+                    {ORDER_STATUS_MILESTONES.map((milestone) => (
+                      <option key={milestone} value={milestone}>
+                        {milestone}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               {/* Customer & Shipping */}
               <div>
                 <h4 className="font-bold text-stone-700 uppercase tracking-wider mb-1">Customer Details</h4>
@@ -338,22 +509,66 @@ export default function AdminOrdersPage() {
                 </div>
               </div>
 
-              {/* Payment Info */}
-              <div className="pt-2 border-t border-stone-100 flex justify-between items-center">
-                <div>
-                  <p className="font-bold text-stone-700">Payment Status</p>
-                  <p className="text-stone-600 font-medium">{selectedOrder.paymentMethod || "Online (Razorpay)"}</p>
-                  {selectedOrder.razorpayPaymentId && (
-                    <p className="text-[10px] text-emerald-800 font-mono mt-0.5 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 w-fit">
-                      Rzp ID: {selectedOrder.razorpayPaymentId}
-                    </p>
+              {/* Payment Mode & Verification Card */}
+              <div className="pt-3 border-t border-stone-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs uppercase tracking-wider font-bold text-stone-800">Payment Verification</h4>
+                  {Number(selectedOrder.discount) > 0 && (
+                    <span className="text-[11px] text-emerald-700 font-bold">
+                      Coupon {selectedOrder.couponCode ? `(${selectedOrder.couponCode})` : ""}: -₹{(Number(selectedOrder.discount) || 0).toLocaleString("en-IN")}
+                    </span>
                   )}
                 </div>
-                <div className="text-right">
-                  <p className="font-bold text-stone-700">Grand Total</p>
-                  <p className="text-base font-bold text-[#571520]">
+
+                {isOnlinePaid(selectedOrder) ? (
+                  <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                        <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>Online Prepaid (Razorpay)</span>
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-200 text-emerald-900 uppercase">
+                        PAID & VERIFIED
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-emerald-800 leading-relaxed">
+                      100% verified online payment. Funds collected and verified prior to order placement.
+                    </p>
+                    {selectedOrder.razorpayPaymentId && (
+                      <div className="text-[11px] font-mono text-emerald-950 bg-white/80 px-2.5 py-1 rounded-lg border border-emerald-200/80">
+                        <span className="font-sans font-bold text-emerald-900">Payment ID: </span>
+                        {selectedOrder.razorpayPaymentId}
+                      </div>
+                    )}
+                    {selectedOrder.razorpayOrderId && (
+                      <div className="text-[11px] font-mono text-emerald-950 bg-white/80 px-2.5 py-1 rounded-lg border border-emerald-200/80">
+                        <span className="font-sans font-bold text-emerald-900">Razorpay Order ID: </span>
+                        {selectedOrder.razorpayOrderId}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                        <Banknote className="w-4 h-4 text-amber-700 shrink-0" />
+                        <span>Cash on Delivery (COD)</span>
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900 uppercase">
+                        PAY ON DELIVERY
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-amber-900 leading-relaxed">
+                      Collect <strong>₹{(Number(selectedOrder.totalAmount) || 0).toLocaleString("en-IN")}</strong> in cash or UPI QR from patron at doorstep delivery.
+                    </p>
+                  </div>
+                )}
+
+                <div className="pt-2 flex items-center justify-between">
+                  <span className="font-bold text-stone-700 text-xs">Total Order Value:</span>
+                  <span className="text-lg font-bold text-[#571520]">
                     ₹{(Number(selectedOrder.totalAmount) || 0).toLocaleString("en-IN")}
-                  </p>
+                  </span>
                 </div>
               </div>
             </div>
@@ -365,7 +580,7 @@ export default function AdminOrdersPage() {
                 <div className="space-y-1">
                   <span className="font-bold block">Tax Invoice Restricted:</span>
                   <p className="text-[11px] leading-relaxed text-amber-800">
-                    Official Tax Invoices can only be printed or downloaded after the order has been delivered to the patron. Current status is <strong className="uppercase underline">{selectedOrder.status}</strong>. Please update the order status to &quot;Delivered&quot; before printing the invoice.
+                    Official Tax Invoices can only be printed or downloaded after the order has been delivered to the patron. Current status is <strong className="uppercase underline">{canonicalStatus(selectedOrder.status)}</strong>. Please update the order status to &quot;Delivered to Doorstep&quot; before printing the invoice.
                   </p>
                 </div>
               </div>
@@ -374,7 +589,7 @@ export default function AdminOrdersPage() {
             <div className="pt-4 border-t border-stone-100 flex gap-2">
               <button
                 onClick={() => {
-                  if ((selectedOrder.status || "").toLowerCase() !== "delivered") {
+                  if (!(selectedOrder.status || "").toLowerCase().includes("deliver")) {
                     setPrintWarning(true);
                   } else {
                     setPrintWarning(false);
@@ -382,14 +597,14 @@ export default function AdminOrdersPage() {
                   }
                 }}
                 className={`flex-1 py-2.5 rounded-xl border font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                  (selectedOrder.status || "").toLowerCase() === "delivered"
+                  (selectedOrder.status || "").toLowerCase().includes("deliver")
                     ? "border-stone-300 hover:bg-stone-50 text-stone-800"
                     : "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
                 }`}
-                title={(selectedOrder.status || "").toLowerCase() === "delivered" ? "Print invoice" : "Invoice requires Delivered status"}
+                title={(selectedOrder.status || "").toLowerCase().includes("deliver") ? "Print invoice" : "Invoice requires Delivered status"}
               >
                 <FileText className="w-4 h-4" />
-                <span>{(selectedOrder.status || "").toLowerCase() === "delivered" ? "Print Invoice" : "Invoice (Delivery Pending)"}</span>
+                <span>{(selectedOrder.status || "").toLowerCase().includes("deliver") ? "Print Invoice" : "Invoice (Delivery Pending)"}</span>
               </button>
               <button
                 onClick={() => {
