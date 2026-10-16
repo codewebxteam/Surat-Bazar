@@ -65,7 +65,9 @@ export default function AccountPage() {
     try {
       const q = query(collection(db, "orders"), where("userId", "==", user.uid));
       const querySnapshot = await getDocs(q);
-      const ordersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const ordersData = querySnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(o => !o.isDeleted);
 
       ordersData.sort((a, b) => {
         const timeA = a.createdAt?.seconds 

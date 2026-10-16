@@ -18,9 +18,11 @@ import {
   PackageCheck,
   CreditCard,
   Banknote,
-  ShieldCheck
+  ShieldCheck,
+  Trash2,
+  AlertTriangle
 } from "lucide-react";
-import { collection, getDocs, doc, updateDoc, orderBy, query } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, deleteDoc, orderBy, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 // Milestone status constants matching the tracking page
@@ -87,6 +89,8 @@ export default function AdminOrdersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [printWarning, setPrintWarning] = useState(false);
+  const [deleteModal, setDeleteModal] = useState(null); // { type: 'single' | 'all', orderId?: string, customer?: string, count?: number }
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -100,10 +104,12 @@ export default function AdminOrdersPage() {
         snapshot = await getDocs(collection(db, "orders"));
       }
 
-      const fetchedOrders = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const fetchedOrders = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        .filter(o => !o.isDeleted);
 
       // Sort manually in case fallback was used
       fetchedOrders.sort((a, b) => {
@@ -123,6 +129,58 @@ export default function AdminOrdersPage() {
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  const handleDeleteOrder = async (orderId) => {
+    setIsDeleting(true);
+    try {
+      try {
+        await deleteDoc(doc(db, "orders", orderId));
+      } catch (delErr) {
+        console.warn("DeleteDoc direct error, falling back to soft delete:", delErr);
+        await updateDoc(doc(db, "orders", orderId), {
+          isDeleted: true,
+          deletedAt: new Date().toISOString(),
+          status: "Cancelled"
+        });
+      }
+      setOrders(prev => prev.filter(o => o.id !== orderId));
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder(null);
+      }
+      setDeleteModal(null);
+    } catch (err) {
+      console.error("Failed to delete order:", err);
+      alert("Failed to delete order: " + (err?.message || ""));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleClearAllOrders = async () => {
+    if (orders.length === 0) return;
+    setIsDeleting(true);
+    try {
+      for (const order of orders) {
+        try {
+          await deleteDoc(doc(db, "orders", order.id));
+        } catch (delErr) {
+          await updateDoc(doc(db, "orders", order.id), {
+            isDeleted: true,
+            deletedAt: new Date().toISOString(),
+            status: "Cancelled"
+          });
+        }
+      }
+      setOrders([]);
+      setSelectedOrder(null);
+      setDeleteModal(null);
+    } catch (err) {
+      console.error("Failed to clear all orders:", err);
+      alert("Failed to clear all orders: " + (err?.message || ""));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const filteredOrders = orders.filter((o) => {
     const q = (searchQuery || "").toLowerCase().trim();
@@ -176,7 +234,17 @@ export default function AdminOrdersPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {orders.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setDeleteModal({ type: "all", count: orders.length })}
+              className="px-3.5 py-1.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              <span>Clear All Test Orders ({orders.length})</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={fetchOrders}
@@ -408,14 +476,24 @@ export default function AdminOrdersPage() {
                       </td>
 
                       <td className="py-3.5 px-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedOrder(order)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold text-xs transition-colors cursor-pointer"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Details</span>
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOrder(order)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold text-xs transition-colors cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Details</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteModal({ type: "single", orderId: order.id, customer: custName })}
+                            title="Delete this order"
+                            className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -586,7 +664,15 @@ export default function AdminOrdersPage() {
               </div>
             )}
 
-            <div className="pt-4 border-t border-stone-100 flex gap-2">
+            <div className="pt-4 border-t border-stone-100 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteModal({ type: "single", orderId: selectedOrder.id, customer: selectedOrder.customer || selectedOrder.shippingDetails?.name || "Patron" })}
+                className="py-2.5 px-4 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4 text-rose-600" />
+                <span>Delete</span>
+              </button>
               <button
                 onClick={() => {
                   if (!(selectedOrder.status || "").toLowerCase().includes("deliver")) {
@@ -614,6 +700,74 @@ export default function AdminOrdersPage() {
                 className="flex-1 py-2.5 rounded-xl bg-[#571520] hover:bg-[#3A0D15] text-[#F3E5C8] font-semibold text-xs cursor-pointer"
               >
                 Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-stone-200 relative animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 pb-3 border-b border-stone-100 text-rose-600">
+              <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="font-serif font-bold text-lg text-stone-900">
+                  {deleteModal.type === "all" ? "Clear All Test Orders?" : "Delete Order?"}
+                </h3>
+                <p className="text-xs text-stone-500">
+                  {deleteModal.type === "all" ? "Remove all test data from database" : `Order #${deleteModal.orderId}`}
+                </p>
+              </div>
+            </div>
+
+            <div className="py-4 text-xs text-stone-600 leading-relaxed">
+              {deleteModal.type === "all" ? (
+                <p>
+                  Are you sure you want to permanently remove all <strong className="text-stone-900">{deleteModal.count} orders</strong> from the admin panel and database? This action cannot be undone.
+                </p>
+              ) : (
+                <p>
+                  Are you sure you want to remove order <strong className="text-stone-900">#{deleteModal.orderId}</strong> for patron <strong className="text-stone-900">{deleteModal.customer}</strong>?
+                </p>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-stone-100 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setDeleteModal(null)}
+                className="px-4 py-2 rounded-xl border border-stone-200 text-stone-700 hover:bg-stone-50 text-xs font-semibold cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => {
+                  if (deleteModal.type === "all") {
+                    handleClearAllOrders();
+                  } else {
+                    handleDeleteOrder(deleteModal.orderId);
+                  }
+                }}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>{deleteModal.type === "all" ? "Yes, Clear All Orders" : "Yes, Delete Order"}</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

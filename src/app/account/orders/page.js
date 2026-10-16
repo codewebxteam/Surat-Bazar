@@ -26,8 +26,9 @@ export default function OrdersPage() {
           collection(db, "orders"),
           where("userId", "==", user.uid)
         );
-        const snapshot = await getDocs(q);
-        const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const fetched = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(d => !d.isDeleted);
 
         // Sort in memory by createdAt / date descending (newest first)
         fetched.sort((a, b) => {

@@ -41,6 +41,7 @@ export default function AdminCustomersPage() {
         
         snapshot.docs.forEach(doc => {
           const data = doc.data();
+          if (data.isDeleted) return;
           // We prioritize matching by userId first, then email, then phone
           // But our checkout primarily saves phone and sometimes userId
           const identifierToMatch = data.userId || data.phone;

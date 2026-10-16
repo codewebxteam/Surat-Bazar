@@ -41,22 +41,27 @@ export default function AdminDashboardPage() {
     try {
       // 1. Fetch Orders
       const ordersSnap = await getDocs(
-        query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(6))
+        query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(12))
       );
-      const recentOrdersList = ordersSnap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const recentOrdersList = ordersSnap.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        .filter(o => !o.isDeleted)
+        .slice(0, 6);
       setOrders(recentOrdersList);
 
       // Fetch all orders for aggregate stats
       const allOrdersSnap = await getDocs(collection(db, "orders"));
-      setAllOrdersCount(allOrdersSnap.size);
+      const validOrders = allOrdersSnap.docs
+        .map(doc => doc.data())
+        .filter(d => !d.isDeleted);
+      setAllOrdersCount(validOrders.length);
 
       let revenueSum = 0;
       let pendingCount = 0;
-      allOrdersSnap.docs.forEach(doc => {
-        const data = doc.data();
+      validOrders.forEach(data => {
         if (!data.status || !data.status.toLowerCase().includes("cancel")) {
           revenueSum += (Number(data.totalAmount) || 0);
         }

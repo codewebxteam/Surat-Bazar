@@ -122,7 +122,7 @@ export default function OrderDetailPage() {
           }
         }
 
-        if (foundData && isMounted) {
+        if (foundData && !foundData.isDeleted && isMounted) {
           setOrder(foundData);
           try {
             sessionStorage.setItem("suratbazar_view_order", JSON.stringify(foundData));

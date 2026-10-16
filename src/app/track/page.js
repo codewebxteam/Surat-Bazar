@@ -67,7 +67,7 @@ function TrackOrderContent() {
         }
       }
 
-      if (foundOrder) {
+      if (foundOrder && !foundOrder.isDeleted) {
         setOrder(foundOrder);
       } else {
         setError(`No active shipment found for "${cleanId}". Please check your Order ID or registered mobile number.`);
