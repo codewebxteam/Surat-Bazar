@@ -33,21 +33,43 @@ const authenticator = async () => {
   }
 };
 
+const DEFAULT_CATEGORIES = [
+  { id: "cat-banarasi", name: "Banarasi Sarees", slug: "banarasi-sarees", type: "main" },
+  { id: "cat-kanjeevaram", name: "Kanjeevaram Silk", slug: "kanjeevaram-silk", type: "main" },
+  { id: "cat-paithani", name: "Paithani Sarees", slug: "paithani-sarees", type: "main" },
+  { id: "cat-organza", name: "Organza Sarees", slug: "organza-sarees", type: "main" },
+  { id: "cat-chiffon", name: "Chiffon & Georgette", slug: "chiffon-georgette", type: "main" },
+  { id: "cat-bandhani", name: "Bandhani Sarees", slug: "bandhani-sarees", type: "main" },
+  { id: "cat-bridal", name: "Bridal Heritage", slug: "bridal-heritage", type: "main" },
+  { id: "fab-katan", name: "Katan Silk", slug: "katan-silk", type: "fabric" },
+  { id: "fab-pure-silk", name: "Pure Silk", slug: "pure-silk", type: "fabric" },
+  { id: "fab-tissue", name: "Tissue Silk", slug: "tissue-silk", type: "fabric" },
+  { id: "fab-organza", name: "Organza Silk", slug: "organza-silk", type: "fabric" },
+  { id: "fab-georgette", name: "Silk Georgette", slug: "silk-georgette", type: "fabric" },
+  { id: "fab-chiffon", name: "Pure Chiffon", slug: "pure-chiffon", type: "fabric" },
+  { id: "fab-tussar", name: "Tussar Silk", slug: "tussar-silk", type: "fabric" },
+];
+
 function AddProductForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("id");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState(false);
-  const [dynamicCategories, setDynamicCategories] = useState([]);
+  const [permissionWarning, setPermissionWarning] = useState(false);
+  const [dynamicCategories, setDynamicCategories] = useState(DEFAULT_CATEGORIES);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        // Fetch Categories
+        // Fetch Categories from Firestore
         const querySnapshot = await getDocs(collection(db, "categories"));
         const cats = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setDynamicCategories(cats);
+        if (cats.length > 0) {
+          setDynamicCategories(cats);
+        } else {
+          setDynamicCategories(DEFAULT_CATEGORIES);
+        }
 
         // If editing, fetch Product
         if (editId) {
@@ -80,7 +102,11 @@ function AddProductForm() {
           }
         }
       } catch (error) {
-        console.error("Error fetching data:", error);
+        console.warn("Categories fetch note:", error);
+        if (error?.code === "permission-denied" || error?.message?.includes("permissions")) {
+          setPermissionWarning(true);
+        }
+        setDynamicCategories(DEFAULT_CATEGORIES);
       }
     }
     fetchData();
@@ -160,8 +186,12 @@ function AddProductForm() {
         router.push("/admin/products");
       }, 1500);
     } catch (error) {
-      console.error("Error adding document: ", error);
-      alert("Failed to add product. Please try again.");
+      console.error("Error saving product: ", error);
+      if (error?.code === "permission-denied" || error?.message?.includes("permissions")) {
+        alert("Firebase Security Rules Warning:\n\n'Missing or insufficient permissions.'\n\nFirebase Console > Firestore Database > Rules me jakar rules update karein taaki admin products add/edit kar sake.");
+      } else {
+        alert("Failed to save product: " + (error?.message || "Please try again."));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -186,6 +216,17 @@ function AddProductForm() {
           </div>
         )}
       </div>
+
+      {permissionWarning && (
+        <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl text-amber-900 text-xs flex items-start gap-3 shadow-xs">
+          <div className="space-y-1">
+            <span className="font-bold block">Firestore Database Rules Notice:</span>
+            <p className="text-[11px] leading-relaxed text-amber-800">
+              Firebase Console me Firestore database security rules read/write ko block kar rahi hain (&quot;Missing or insufficient permissions&quot;). Dropdowns ke liye default categories load ho gaye hain. Nayi sarees Firestore me save karne ke liye Firebase Console &gt; Firestore Database &gt; Rules ko update karein.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-3xl border border-amber-900/10 shadow-sm overflow-hidden p-6 sm:p-8">
         <div className="flex items-center gap-3 pb-6 border-b border-stone-100 mb-6">

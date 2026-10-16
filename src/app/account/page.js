@@ -31,6 +31,7 @@ import { useCartWishlist } from "@/context/CartWishlistContext";
 import ProductCard from "@/components/ProductCard";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import LogoutConfirmModal from "@/components/LogoutConfirmModal";
 
 export default function AccountPage() {
   const [activeTab, setActiveTab] = useState("profile"); // "profile" | "orders" | "wishlist" | "addresses" | "track" | "returns"
@@ -88,9 +89,24 @@ export default function AccountPage() {
     }
   }
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    router.push("/login");
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
+
+  const handleLogoutClick = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const handleConfirmLogout = async () => {
+    setLogoutLoading(true);
+    try {
+      await signOut(auth);
+      router.push("/login");
+    } catch (err) {
+      console.error("Logout error:", err);
+    } finally {
+      setLogoutLoading(false);
+      setShowLogoutConfirm(false);
+    }
   };
 
   const [trackQuery, setTrackQuery] = useState("");
@@ -182,7 +198,7 @@ export default function AccountPage() {
 
             <div className="flex items-center gap-3">
               <button
-                onClick={handleLogout}
+                onClick={handleLogoutClick}
                 className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full border border-stone-300 hover:border-rose-600 text-xs font-semibold text-stone-700 hover:text-rose-600 transition-colors cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -226,8 +242,8 @@ export default function AccountPage() {
 
               <div className="pt-2 border-t border-stone-100">
                 <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs font-semibold text-rose-700 hover:bg-rose-50 transition-colors text-left"
+                  onClick={handleLogoutClick}
+                  className="w-full flex items-center gap-2.5 px-4 py-3 rounded-xl text-xs font-semibold text-rose-700 hover:bg-rose-50 transition-colors text-left cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Logout</span>
@@ -523,6 +539,16 @@ export default function AccountPage() {
 
         </div>
       </main>
+
+      {/* Confirmation Popup On Logout */}
+      <LogoutConfirmModal
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={handleConfirmLogout}
+        loading={logoutLoading}
+        userName={userData?.name || user?.displayName || ""}
+        isAdmin={false}
+      />
 
       <Footer />
     </>

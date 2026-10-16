@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { 
   DollarSign, 
   ShoppingBag, 
@@ -17,79 +16,107 @@ import {
   CheckCircle,
   Truck,
   Sparkles,
-  Layers
+  Layers,
+  RefreshCw,
+  Loader2
 } from "lucide-react";
 import AdminStatsCard from "./components/AdminStatsCard";
+import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { PRODUCTS } from "@/data/products";
 
 export default function AdminDashboardPage() {
-  const [recentOrders, setRecentOrders] = useState([
-    {
-      id: "SB-9842",
-      customer: "Meera Singhania",
-      city: "New Delhi",
-      items: "Rani Gulabi Katan Banarasi Kadwa Saree",
-      amount: "₹38,500",
-      status: "Processing",
-      payment: "Online (Prepaid)",
-      date: "Today, 02:40 PM"
-    },
-    {
-      id: "SB-9841",
-      customer: "Ananya Deshmukh",
-      city: "Mumbai",
-      items: "Emerald Royale Scalloped Silk Georgette",
-      amount: "₹24,999",
-      status: "Dispatched",
-      payment: "Online (Prepaid)",
-      date: "Today, 11:15 AM"
-    },
-    {
-      id: "SB-9840",
-      customer: "Kavita Reddy",
-      city: "Hyderabad",
-      items: "Heritage Crimson Kanjeevaram Silk",
-      amount: "₹42,000",
-      status: "Delivered",
-      payment: "COD",
-      date: "Yesterday"
-    },
-    {
-      id: "SB-9839",
-      customer: "Rituja Patil",
-      city: "Pune",
-      items: "Pastel Lavender Tissue Organza Saree",
-      amount: "₹18,750",
-      status: "Pending",
-      payment: "Online (Prepaid)",
-      date: "Yesterday"
-    },
-    {
-      id: "SB-9838",
-      customer: "Sunita Aggarwal",
-      city: "Jaipur",
-      items: "Royal Peacock Blue Paithani Silk",
-      amount: "₹36,200",
-      status: "Delivered",
-      payment: "Online (Prepaid)",
-      date: "Oct 01, 2026"
-    }
-  ]);
+  const [loading, setLoading] = useState(true);
+  const [orders, setOrders] = useState([]);
+  const [allOrdersCount, setAllOrdersCount] = useState(0);
+  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+  const [totalProductsCount, setTotalProductsCount] = useState(0);
+  const [lowStockProducts, setLowStockProducts] = useState([]);
+  const [patronsCount, setPatronsCount] = useState(0);
+  const [topSarees, setTopSarees] = useState([]);
 
-  const statusBadge = (status) => {
-    switch (status) {
-      case "Delivered":
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      // 1. Fetch Orders
+      const ordersSnap = await getDocs(
+        query(collection(db, "orders"), orderBy("createdAt", "desc"), limit(6))
+      );
+      const recentOrdersList = ordersSnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setOrders(recentOrdersList);
+
+      // Fetch all orders for aggregate stats
+      const allOrdersSnap = await getDocs(collection(db, "orders"));
+      setAllOrdersCount(allOrdersSnap.size);
+
+      let revenueSum = 0;
+      let pendingCount = 0;
+      allOrdersSnap.docs.forEach(doc => {
+        const data = doc.data();
+        if (data.status !== "Cancelled") {
+          revenueSum += (Number(data.totalAmount) || 0);
+        }
+        const status = (data.status || "").toLowerCase();
+        if (status === "pending" || status === "confirmed" || status === "processing") {
+          pendingCount += 1;
+        }
+      });
+      setTotalRevenue(revenueSum);
+      setPendingOrdersCount(pendingCount);
+
+      // 2. Fetch Products
+      const productsSnap = await getDocs(collection(db, "products"));
+      const productsList = productsSnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // If Firestore products exist, use them; otherwise fallback to static catalog for initial display
+      const activeProducts = productsList.length > 0 ? productsList : PRODUCTS;
+      setTotalProductsCount(activeProducts.length);
+
+      // Calculate low stock items (stock <= 3)
+      const lowStock = activeProducts.filter(p => (Number(p.stock) || 0) <= 3);
+      setLowStockProducts(lowStock);
+
+      // Top sarees
+      setTopSarees(activeProducts.slice(0, 5));
+
+      // 3. Fetch Registered Patrons
+      const usersSnap = await getDocs(collection(db, "users"));
+      const customers = usersSnap.docs.filter(doc => doc.data().role !== "admin");
+      setPatronsCount(customers.length);
+
+    } catch (err) {
+      console.error("Dashboard data fetching error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const statusBadge = (status = "") => {
+    switch (status.toLowerCase()) {
+      case "delivered":
         return "bg-emerald-100 text-emerald-800 border-emerald-200";
-      case "Dispatched":
+      case "dispatched":
         return "bg-sky-100 text-sky-800 border-sky-200";
-      case "Processing":
+      case "processing":
+      case "confirmed":
         return "bg-amber-100 text-amber-800 border-amber-200";
+      case "cancelled":
+        return "bg-rose-100 text-rose-800 border-rose-200";
       default:
         return "bg-stone-100 text-stone-800 border-stone-200";
     }
   };
-
-  const topSarees = PRODUCTS.slice(0, 5);
 
   return (
     <div className="space-y-8">
@@ -106,21 +133,29 @@ export default function AdminDashboardPage() {
             Namaste, Store Manager 👋
           </h1>
           <p className="text-stone-300 text-xs sm:text-sm mt-1 max-w-xl">
-            You have <span className="text-[#E8C574] font-semibold">8 new orders</span> today and 3 sarees needing urgent restock in the Surat warehouse.
+            You currently have <span className="text-[#E8C574] font-semibold">{pendingOrdersCount} orders</span> awaiting dispatch and <span className="text-rose-400 font-semibold">{lowStockProducts.length} sarees</span> in low stock.
           </p>
         </div>
 
         <div className="flex items-center gap-3 relative z-10 shrink-0">
+          <button
+            type="button"
+            onClick={fetchDashboardData}
+            title="Refresh Dashboard"
+            className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all border border-white/20 cursor-pointer"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </button>
           <Link
             href="/admin/products/new"
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#C5832B] to-[#9B111E] text-white font-semibold text-xs sm:text-sm shadow-md hover:shadow-lg transition-all flex items-center gap-2 border border-[#E8C574]/40"
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#C5832B] to-[#9B111E] text-white font-semibold text-xs sm:text-sm shadow-md hover:shadow-lg transition-all flex items-center gap-2 border border-[#E8C574]/40 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Add Saree</span>
           </Link>
           <Link
             href="/admin/orders"
-            className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs sm:text-sm transition-all border border-white/20 flex items-center gap-2 backdrop-blur-xs"
+            className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs sm:text-sm transition-all border border-white/20 flex items-center gap-2 backdrop-blur-xs cursor-pointer"
           >
             <span>View Orders</span>
             <ArrowUpRight className="w-4 h-4 text-[#E8C574]" />
@@ -131,39 +166,39 @@ export default function AdminDashboardPage() {
       {/* Analytics Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <AdminStatsCard
-          title="Total Month Sales"
-          value="₹14,82,450"
-          change="18.4% vs last month"
+          title="Total Store Revenue"
+          value={loading ? "..." : `₹${totalRevenue.toLocaleString("en-IN")}`}
+          change="Real-time gross"
           isPositive={true}
           icon={DollarSign}
-          subtext="342 sarees sold"
+          subtext={`${allOrdersCount} total orders recorded`}
           color="amber"
         />
         <AdminStatsCard
-          title="Orders (This Week)"
-          value="86 Orders"
-          change="12% growth"
-          isPositive={true}
+          title="Orders Pipeline"
+          value={loading ? "..." : `${allOrdersCount} Orders`}
+          change={`${pendingOrdersCount} need action`}
+          isPositive={pendingOrdersCount === 0}
           icon={ShoppingBag}
-          subtext="8 pending dispatch"
+          subtext={`${pendingOrdersCount} pending dispatch`}
           color="rose"
         />
         <AdminStatsCard
           title="Active Inventory"
-          value={`${PRODUCTS.length} Designs`}
-          change="4 new added"
-          isPositive={true}
+          value={loading ? "..." : `${totalProductsCount} Designs`}
+          change={`${lowStockProducts.length} low stock`}
+          isPositive={lowStockProducts.length === 0}
           icon={Package}
-          subtext="3 low stock"
+          subtext="Surat warehouse catalog"
           color="emerald"
         />
         <AdminStatsCard
           title="Registered Patrons"
-          value="1,420 Users"
-          change="94 new this month"
+          value={loading ? "..." : `${patronsCount} Customers`}
+          change="Verified accounts"
           isPositive={true}
           icon={Users}
-          subtext="74% repeat rate"
+          subtext="Direct boutique patrons"
           color="blue"
         />
       </div>
@@ -176,70 +211,90 @@ export default function AdminDashboardPage() {
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-stone-100">
               <div>
                 <h2 className="font-serif text-lg sm:text-xl font-bold text-stone-900">
-                  Recent Orders
+                  Recent Orders Feed
                 </h2>
-                <p className="text-xs text-stone-500">Live order feed from Suratbazar storefront</p>
+                <p className="text-xs text-stone-500">Live order transactions from Suratbazar storefront</p>
               </div>
               <Link
                 href="/admin/orders"
                 className="text-xs font-bold text-[#571520] hover:text-[#9B111E] flex items-center gap-1 hover:underline"
               >
-                <span>View all ({recentOrders.length})</span>
+                <span>Manage all ({allOrdersCount})</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
               </Link>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-stone-100 text-stone-400 uppercase tracking-wider font-semibold">
-                    <th className="pb-3 pl-2">Order ID</th>
-                    <th className="pb-3">Customer</th>
-                    <th className="pb-3">Item Details</th>
-                    <th className="pb-3">Amount</th>
-                    <th className="pb-3">Status</th>
-                    <th className="pb-3 text-right pr-2">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100 font-medium">
-                  {recentOrders.map((order) => (
-                    <tr key={order.id} className="hover:bg-amber-50/30 transition-colors">
-                      <td className="py-3.5 pl-2 font-mono font-bold text-stone-800">
-                        {order.id}
-                      </td>
-                      <td className="py-3.5">
-                        <div className="font-semibold text-stone-900">{order.customer}</div>
-                        <div className="text-[11px] text-stone-400">{order.city}</div>
-                      </td>
-                      <td className="py-3.5 text-stone-700 max-w-[160px] truncate" title={order.items}>
-                        {order.items}
-                      </td>
-                      <td className="py-3.5 font-semibold text-stone-900">
-                        {order.amount}
-                      </td>
-                      <td className="py-3.5">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${statusBadge(order.status)}`}>
-                          {order.status}
-                        </span>
-                      </td>
-                      <td className="py-3.5 text-right pr-2">
-                        <Link
-                          href="/admin/orders"
-                          className="inline-flex items-center justify-center p-1.5 rounded-lg text-stone-500 hover:text-stone-900 hover:bg-stone-100 transition-colors"
-                          title="Manage Order"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Link>
-                      </td>
+            {loading ? (
+              <div className="py-16 text-center text-stone-400 flex flex-col items-center justify-center gap-2">
+                <Loader2 className="w-6 h-6 animate-spin text-[#C5832B]" />
+                <span className="text-xs">Fetching live orders...</span>
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="py-16 text-center text-stone-400">
+                <ShoppingBag className="w-10 h-10 mx-auto text-stone-300 mb-2 stroke-1" />
+                <p className="text-xs font-medium text-stone-600">No orders placed yet</p>
+                <p className="text-[11px] text-stone-400 mt-1">Orders from the storefront checkout will appear here in real time.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-stone-100 text-stone-400 uppercase tracking-wider font-semibold">
+                      <th className="pb-3 pl-2">Order ID</th>
+                      <th className="pb-3">Customer</th>
+                      <th className="pb-3">Item Details</th>
+                      <th className="pb-3">Amount</th>
+                      <th className="pb-3">Status</th>
+                      <th className="pb-3 text-right pr-2">Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100 font-medium">
+                    {orders.map((order) => {
+                      const firstItem = order.items && order.items[0];
+                      const itemSummary = firstItem 
+                        ? `${firstItem.name || 'Silk Saree'}${order.items.length > 1 ? ` + ${order.items.length - 1} more` : ''}`
+                        : 'Saree Order';
+
+                      return (
+                        <tr key={order.id} className="hover:bg-amber-50/30 transition-colors">
+                          <td className="py-3.5 pl-2 font-mono font-bold text-stone-800">
+                            #{order.id}
+                          </td>
+                          <td className="py-3.5">
+                            <div className="font-semibold text-stone-900">{order.customer || order.shippingDetails?.name || "Patron"}</div>
+                            <div className="text-[11px] text-stone-400">{order.shippingDetails?.city || "India"}</div>
+                          </td>
+                          <td className="py-3.5 text-stone-700 max-w-[160px] truncate" title={itemSummary}>
+                            {itemSummary}
+                          </td>
+                          <td className="py-3.5 font-semibold text-stone-900">
+                            ₹{(Number(order.totalAmount) || 0).toLocaleString("en-IN")}
+                          </td>
+                          <td className="py-3.5">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${statusBadge(order.status)}`}>
+                              {order.status || "Confirmed"}
+                            </span>
+                          </td>
+                          <td className="py-3.5 text-right pr-2">
+                            <Link
+                              href="/admin/orders"
+                              className="inline-flex items-center justify-center p-1.5 rounded-lg text-stone-500 hover:text-stone-900 hover:bg-stone-100 transition-colors"
+                              title="Manage Order"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           <div className="mt-4 pt-4 border-t border-stone-100 flex items-center justify-between text-xs text-stone-500">
-            <span>Showing recent 5 transactions</span>
+            <span>Showing recent {orders.length} transactions</span>
             <span className="flex items-center gap-1.5 text-emerald-600 font-semibold">
               <CheckCircle className="w-4 h-4" /> Razorpay & Cash on Delivery active
             </span>
@@ -255,36 +310,43 @@ export default function AdminDashboardPage() {
                 Top Trending Sarees
               </h2>
               <Link href="/admin/products" className="text-xs text-[#571520] font-semibold hover:underline">
-                Catalog
+                Catalog ({totalProductsCount})
               </Link>
             </div>
 
             <div className="space-y-3.5">
-              {topSarees.map((saree, i) => (
-                <div key={saree.id} className="flex items-center gap-3 group">
-                  <div className="w-12 h-14 rounded-xl overflow-hidden bg-stone-100 relative shrink-0 border border-stone-200">
-                    <img
-                      src={saree.images[0]}
-                      alt={saree.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                    />
+              {topSarees.map((saree, i) => {
+                const img = (saree.images && saree.images.length > 0) ? saree.images[0] : saree.image || "";
+                return (
+                  <div key={saree.id || i} className="flex items-center gap-3 group">
+                    <div className="w-12 h-14 rounded-xl overflow-hidden bg-stone-100 relative shrink-0 border border-stone-200">
+                      {img ? (
+                        <img
+                          src={img}
+                          alt={saree.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-stone-200 text-[9px] text-stone-500">No Img</div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs font-bold text-stone-900 truncate" title={saree.name}>
+                        {saree.name}
+                      </h4>
+                      <p className="text-[11px] text-[#C5832B] font-semibold">
+                        ₹{(Number(saree.price) || 0).toLocaleString("en-IN")}
+                      </p>
+                      <p className="text-[10px] text-stone-400">
+                        {saree.fabricName || saree.fabric || "Pure Silk"} • Stock: <span className={(Number(saree.stock) || 0) <= 3 ? "text-rose-600 font-bold" : "text-stone-600"}>{saree.stock ?? 8} pcs</span>
+                      </p>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-stone-400">
+                      #{i + 1}
+                    </span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-xs font-bold text-stone-900 truncate" title={saree.name}>
-                      {saree.name}
-                    </h4>
-                    <p className="text-[11px] text-[#C5832B] font-semibold">
-                      ₹{saree.price?.toLocaleString("en-IN")}
-                    </p>
-                    <p className="text-[10px] text-stone-400">
-                      {saree.fabricName} • Stock: <span className={saree.stock <= 5 ? "text-rose-600 font-bold" : "text-stone-600"}>{saree.stock || 8} pcs</span>
-                    </p>
-                  </div>
-                  <span className="text-xs font-mono font-bold text-stone-400">
-                    #{i + 1}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -297,13 +359,15 @@ export default function AdminDashboardPage() {
               <div className="flex-1">
                 <h3 className="font-serif font-bold text-sm text-rose-950">Low Stock Alert</h3>
                 <p className="text-xs text-rose-800 mt-0.5">
-                  3 Sarees are below minimum safe stock limit (less than 3 pieces).
+                  {lowStockProducts.length > 0 
+                    ? `${lowStockProducts.length} Sarees are below minimum safe stock limit (3 pieces or less).`
+                    : "All sarees are comfortably in stock above threshold."}
                 </p>
                 <Link
-                  href="/admin/inventory"
-                  className="inline-block mt-3 px-3 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-800 text-white font-semibold text-xs shadow-xs transition-colors"
+                  href="/admin/products"
+                  className="inline-block mt-3 px-3 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-800 text-white font-semibold text-xs shadow-xs transition-colors cursor-pointer"
                 >
-                  Restock Inventory →
+                  Manage Inventory →
                 </Link>
               </div>
             </div>

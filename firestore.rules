@@ -1,0 +1,40 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. Products: Public read for store visitors, authenticated write for admin
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // 2. Categories: Public read for navigation, authenticated write for admin
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // 3. Store Settings & Promotions (Banners & Coupons)
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // 4. Orders: Customers (including guest checkout) can create orders, authenticated users can read/manage
+    match /orders/{orderId} {
+      allow create: if true;
+      allow read, update, delete: if true; // Allows order lookup by ID/phone and admin dispatch updates
+    }
+
+    // 5. Users collection: Profile access & customer management
+    match /users/{userId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Fallback: If you are testing in development, you can use:
+    // match /{document=**} {
+    //   allow read, write: if true;
+    // }
+  }
+}

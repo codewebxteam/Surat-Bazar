@@ -14,6 +14,8 @@ import {
   X 
 } from "lucide-react";
 import { ANNOUNCEMENT_MESSAGES } from "@/data/banners";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export const DEFAULT_ANNOUNCEMENTS = ANNOUNCEMENT_MESSAGES;
 
@@ -24,23 +26,52 @@ export default function AnnouncementBar({
   showControls = true,
   dismissible = false,
 }) {
+  const [activeMessages, setActiveMessages] = useState(messages);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [copiedCode, setCopiedCode] = useState(null);
   const [isDismissed, setIsDismissed] = useState(false);
   const timerRef = useRef(null);
 
+  useEffect(() => {
+    async function fetchDynamicPromotions() {
+      try {
+        const docRef = doc(db, "settings", "promotions");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.announcementText && data.announcementText.trim()) {
+            const dynamicList = [
+              {
+                id: "admin-announcement-1",
+                text: data.announcementText.trim(),
+                icon: "Sparkles",
+                highlight: "LIVE OFFER",
+                badge: "OFFICIAL"
+              },
+              ...DEFAULT_ANNOUNCEMENTS.slice(1)
+            ];
+            setActiveMessages(dynamicList);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load dynamic promotions:", err);
+      }
+    }
+    fetchDynamicPromotions();
+  }, []);
+
   const nextMessage = useCallback(() => {
-    setCurrentIndex((prev) => (prev + 1) % messages.length);
-  }, [messages.length]);
+    setCurrentIndex((prev) => (prev + 1) % activeMessages.length);
+  }, [activeMessages.length]);
 
   const prevMessage = useCallback(() => {
-    setCurrentIndex((prev) => (prev - 1 + messages.length) % messages.length);
-  }, [messages.length]);
+    setCurrentIndex((prev) => (prev - 1 + activeMessages.length) % activeMessages.length);
+  }, [activeMessages.length]);
 
   // Auto-rotation effect
   useEffect(() => {
-    if (autoRotate && !isPaused && messages.length > 1) {
+    if (autoRotate && !isPaused && activeMessages.length > 1) {
       timerRef.current = setInterval(() => {
         nextMessage();
       }, interval);
@@ -48,7 +79,7 @@ export default function AnnouncementBar({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [autoRotate, isPaused, messages.length, interval, nextMessage]);
+  }, [autoRotate, isPaused, activeMessages.length, interval, nextMessage]);
 
   const copyPromo = (e, code) => {
     e.preventDefault();
@@ -58,9 +89,9 @@ export default function AnnouncementBar({
     setTimeout(() => setCopiedCode(null), 2500);
   };
 
-  if (isDismissed || messages.length === 0) return null;
+  if (isDismissed || activeMessages.length === 0) return null;
 
-  const currentMsg = messages[currentIndex];
+  const currentMsg = activeMessages[currentIndex % activeMessages.length] || activeMessages[0];
 
   const renderIcon = (type) => {
     switch (type) {
@@ -80,7 +111,7 @@ export default function AnnouncementBar({
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
         
         {/* Left Mini Prev Arrow (if multiple messages) */}
-        {showControls && messages.length > 1 && (
+        {showControls && activeMessages.length > 1 && (
           <button
             onClick={prevMessage}
             aria-label="Previous promotional message"
@@ -145,7 +176,7 @@ export default function AnnouncementBar({
 
         {/* Right Mini Next Arrow & Dismiss Button */}
         <div className="flex items-center gap-1 shrink-0">
-          {showControls && messages.length > 1 && (
+          {showControls && activeMessages.length > 1 && (
             <button
               onClick={nextMessage}
               aria-label="Next promotional message"

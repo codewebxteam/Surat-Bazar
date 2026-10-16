@@ -3,6 +3,7 @@ import "./globals.css";
 import { CartWishlistProvider } from "@/context/CartWishlistContext";
 import { AuthProvider } from "@/context/AuthContext";
 import MobileBottomNav from "@/components/MobileBottomNav";
+import WelcomeModal from "@/components/WelcomeModal";
 
 const cormorant = Cormorant_Garamond({
   variable: "--font-cormorant",
@@ -31,6 +32,8 @@ export default function RootLayout({ children }) {
         <AuthProvider>
           <CartWishlistProvider>
             {children}
+            {/* Welcome Greeting Popup After Login */}
+            <WelcomeModal />
             {/* Fixed Mobile Bottom Navigation Tab (Hidden on Desktop) */}
             <MobileBottomNav />
           </CartWishlistProvider>

@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, 
   Package, 
@@ -17,16 +18,37 @@ import {
   LogOut,
   Boxes
 } from "lucide-react";
+import { auth } from "@/lib/firebase";
+import { signOut } from "firebase/auth";
+import { useAuth } from "@/context/AuthContext";
+import LogoutConfirmModal from "@/components/LogoutConfirmModal";
 
 export default function AdminSidebar({ isMobileOpen, setIsMobileOpen }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user } = useAuth();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
+
+  const handleAdminLogout = async () => {
+    setLogoutLoading(true);
+    try {
+      await signOut(auth);
+      router.push("/login");
+    } catch (err) {
+      console.error("Admin logout error:", err);
+    } finally {
+      setLogoutLoading(false);
+      setShowLogoutModal(false);
+    }
+  };
 
   const navigation = [
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard, exact: true },
     { name: "Categories", href: "/admin/categories", icon: Layers },
     { name: "Sarees & Inventory", href: "/admin/products", icon: Package },
     { name: "Add New Saree", href: "/admin/products/new", icon: PlusCircle, highlight: true },
-    { name: "Orders", href: "/admin/orders", icon: ShoppingBag, badge: "8 New" },
+    { name: "Orders", href: "/admin/orders", icon: ShoppingBag },
     { name: "Customers", href: "/admin/customers", icon: Users },
     { name: "Banners & Offers", href: "/admin/banners", icon: Sliders },
     { name: "Store Settings", href: "/admin/settings", icon: Settings },
@@ -142,16 +164,27 @@ export default function AdminSidebar({ isMobileOpen, setIsMobileOpen }) {
                 <p className="text-[11px] text-stone-400">admin@suratbazar.com</p>
               </div>
             </div>
-            <Link 
-              href="/login" 
-              title="Logout"
-              className="p-1.5 rounded-lg text-stone-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+            <button 
+              type="button"
+              onClick={() => setShowLogoutModal(true)} 
+              title="Logout from Admin"
+              className="p-1.5 rounded-lg text-stone-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
-            </Link>
+            </button>
           </div>
         </div>
       </aside>
+
+      {/* Admin Logout Confirmation Modal */}
+      <LogoutConfirmModal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleAdminLogout}
+        loading={logoutLoading}
+        userName={user?.displayName || "Super Admin"}
+        isAdmin={true}
+      />
     </>
   );
 }

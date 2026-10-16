@@ -19,10 +19,12 @@ import {
 } from "lucide-react";
 import { collection, getDocs, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { PRODUCTS } from "@/data/products";
 
 export default function AdminProductsPage() {
   const [productsList, setProductsList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [permissionError, setPermissionError] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterFabric, setFilterFabric] = useState("all");
@@ -33,9 +35,17 @@ export default function AdminProductsPage() {
       try {
         const querySnapshot = await getDocs(collection(db, "products"));
         const products = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setProductsList(products);
+        if (products.length > 0) {
+          setProductsList(products);
+        } else {
+          setProductsList(PRODUCTS);
+        }
       } catch (error) {
         console.error("Error fetching products:", error);
+        if (error?.code === "permission-denied" || error?.message?.includes("permissions")) {
+          setPermissionError(true);
+        }
+        setProductsList(PRODUCTS);
       } finally {
         setLoading(false);
       }
@@ -114,6 +124,18 @@ export default function AdminProductsPage() {
           </Link>
         </div>
       </div>
+
+      {permissionError && (
+        <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl text-amber-900 text-xs flex items-start gap-3 shadow-xs">
+          <AlertCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <span className="font-bold block">Firestore Database Rules Notice:</span>
+            <p className="text-[11px] leading-relaxed text-amber-800">
+              Firebase Console me Firestore rules read/write ko block kar rahi hain (&quot;Missing or insufficient permissions&quot;). Humne fallback catalog display kar diya hai taaki UI empty na dikhe. Firestore me real data save karne ke liye Firebase Console &gt; Firestore Database &gt; Rules update karein.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Inventory Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

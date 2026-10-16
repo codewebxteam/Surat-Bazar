@@ -110,11 +110,15 @@ export default function AdminCustomersPage() {
 
 
 
-  const filtered = customers.filter(c => 
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.email.toLowerCase().includes(search.toLowerCase()) ||
-    c.city.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = customers.filter((c) => {
+    const q = (search || "").toLowerCase().trim();
+    if (!q) return true;
+    const name = (c.name || "").toLowerCase();
+    const email = (c.email || "").toLowerCase();
+    const city = (c.city || "").toLowerCase();
+    const phone = String(c.phone || "");
+    return name.includes(q) || email.includes(q) || city.includes(q) || phone.includes(q);
+  });
 
   return (
     <div className="space-y-6">
