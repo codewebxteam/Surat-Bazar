@@ -584,11 +584,11 @@ export default function CheckoutPage() {
     <>
       <Navbar />
 
-      <main className="w-full bg-[#FAF7F2] min-h-screen py-10 sm:py-16">
+      <main className="w-full bg-[#FAF7F2] min-h-screen pt-3 sm:pt-5 pb-12 sm:pb-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12">
           
           {/* Top Bar Navigation */}
-          <div className="flex items-center justify-between mb-8 pb-4 border-b border-stone-200">
+          <div className="flex items-center justify-between mb-3 sm:mb-4 pb-2.5 sm:pb-3 border-b border-stone-200">
             <Link href="/cart" className="inline-flex items-center gap-1.5 text-xs text-stone-600 hover:text-[#3E0C15] font-semibold">
               <ArrowLeft className="w-4 h-4" />
               <span>Return to Shopping Bag</span>
@@ -620,45 +620,65 @@ export default function CheckoutPage() {
             </div>
           ) : (
             <>
-              {/* 4-STEP PROGRESS BAR (Address -> Delivery -> Payment -> Confirmation) */}
-              <div className="max-w-3xl mx-auto mb-10">
-            <div className="grid grid-cols-4 gap-2 relative">
-              {stepLabels.map((step) => {
-                const Icon = step.icon;
-                const isCompleted = currentStep > step.num;
-                const isCurrent = currentStep === step.num;
-
-                return (
-                  <button
-                    key={step.num}
-                    onClick={() => {
-                      if (step.num < currentStep) setCurrentStep(step.num);
-                    }}
-                    className={`flex flex-col items-center text-center group cursor-pointer transition-all ${
-                      isCurrent 
-                        ? "text-[#3E0C15]" 
-                        : isCompleted 
-                        ? "text-emerald-700" 
-                        : "text-stone-400 opacity-60"
-                    }`}
-                  >
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs mb-1.5 transition-all shadow-sm ${
-                      isCurrent 
-                        ? "bg-[#3E0C15] text-[#F7EFCF] ring-4 ring-amber-500/20 scale-105" 
-                        : isCompleted 
-                        ? "bg-emerald-600 text-white" 
-                        : "bg-stone-200 text-stone-600"
-                    }`}>
-                      {isCompleted ? <Check className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
+              {/* STICKY COMPACT 4-STEP PROGRESS BAR (Address -> Delivery -> Payment -> Confirmation) */}
+              <div 
+                className="sticky z-30 -mx-4 sm:-mx-6 lg:-mx-12 px-4 sm:px-6 lg:px-12 py-2 sm:py-2.5 mb-5 sm:mb-6 bg-[#FAF7F2]/95 backdrop-blur-md border-y border-amber-900/10 shadow-xs transition-all"
+                style={{ top: "var(--header-height, 120px)" }}
+              >
+                <div className="max-w-2xl mx-auto">
+                  <div className="grid grid-cols-4 gap-1 sm:gap-2 relative items-center">
+                    {/* Background Progress Track Line */}
+                    <div className="absolute top-[12px] sm:top-[14px] left-[12%] right-[12%] h-[2px] bg-stone-200 -z-0">
+                      <div 
+                        className="h-full bg-emerald-600 transition-all duration-300"
+                        style={{ width: `${((currentStep - 1) / 3) * 100}%` }}
+                      />
                     </div>
-                    <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider">
-                      {step.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+
+                    {stepLabels.map((step) => {
+                      const Icon = step.icon;
+                      const isCompleted = currentStep > step.num;
+                      const isCurrent = currentStep === step.num;
+
+                      return (
+                        <button
+                          key={step.num}
+                          type="button"
+                          onClick={() => {
+                            if (step.num < currentStep) setCurrentStep(step.num);
+                          }}
+                          className={`relative z-10 flex flex-col items-center justify-center text-center group transition-all ${
+                            step.num <= currentStep ? "cursor-pointer" : "cursor-default"
+                          }`}
+                        >
+                          <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center font-bold text-xs transition-all shadow-xs ${
+                            isCurrent 
+                              ? "bg-[#3E0C15] text-[#F7EFCF] ring-2 ring-amber-500/40 scale-105" 
+                              : isCompleted 
+                              ? "bg-emerald-600 text-white" 
+                              : "bg-white text-stone-400 border border-stone-300"
+                          }`}>
+                            {isCompleted ? (
+                              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                            ) : (
+                              <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                            )}
+                          </div>
+                          <span className={`text-[9px] sm:text-[11px] font-bold uppercase tracking-wider mt-0.5 sm:mt-1 transition-colors ${
+                            isCurrent 
+                              ? "text-[#3E0C15] font-extrabold" 
+                              : isCompleted 
+                              ? "text-emerald-700 font-bold" 
+                              : "text-stone-400 opacity-70"
+                          }`}>
+                            {step.label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
 
           {/* Two-Column Grid: Left Step Form (7 cols) + Right Order Summary (5 cols) */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
@@ -1128,25 +1148,15 @@ export default function CheckoutPage() {
                             <CreditCard className="w-5 h-5" />
                           </div>
                           <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-bold text-sm text-stone-900">Razorpay Secure Online Checkout</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-sm text-stone-900">Online Payment (UPI, Cards, NetBanking)</span>
                               <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full">
-                                Recommended • Instant Popup
+                                Instant &amp; Secure
                               </span>
                             </div>
                             <p className="text-xs text-stone-600 mt-1">
-                              Pay instantly via UPI (GPay, PhonePe, Paytm, CRED), Credit/Debit Cards, NetBanking, or Wallets.
+                              Pay instantly via UPI (GPay, PhonePe, Paytm), Credit/Debit Cards, or NetBanking.
                             </p>
-                            <p className="text-[11px] text-amber-900 font-medium mt-1">
-                              ✓ Opens official secure popup modal directly — No payment links or external redirections.
-                            </p>
-                            <div className="flex flex-wrap items-center gap-1.5 mt-2.5 text-[11px] text-stone-600 font-semibold">
-                              <span className="px-2 py-0.5 bg-white border border-stone-200 rounded">UPI</span>
-                              <span className="px-2 py-0.5 bg-white border border-stone-200 rounded">Google Pay</span>
-                              <span className="px-2 py-0.5 bg-white border border-stone-200 rounded">PhonePe</span>
-                              <span className="px-2 py-0.5 bg-white border border-stone-200 rounded">Cards</span>
-                              <span className="px-2 py-0.5 bg-white border border-stone-200 rounded">NetBanking</span>
-                            </div>
                           </div>
                         </div>
                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-1 ${paymentMethod === "razorpay" ? "border-[#3E0C15] bg-[#3E0C15]" : "border-stone-300"}`}>
@@ -1317,7 +1327,7 @@ export default function CheckoutPage() {
             </div>
 
             {/* Right Column: Order Summary (5 cols) */}
-            <div className="lg:col-span-5 space-y-6 sticky top-28">
+            <div className="lg:col-span-5 space-y-6 lg:sticky" style={{ top: "calc(var(--header-height, 120px) + 64px)" }}>
               <div className="bg-white rounded-3xl border border-amber-900/10 p-6 sm:p-8 shadow-lg">
                 <h3 className="font-serif-luxury text-xl font-bold text-[#2D0A10] pb-4 border-b border-stone-200 flex items-center justify-between">
                   <span>Bag Items ({cart.reduce((sum, item) => sum + item.quantity, 0)})</span>

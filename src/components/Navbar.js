@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { 
@@ -37,6 +37,7 @@ export default function Navbar({ navItems = HEADER_NAV_ITEMS, config = SITE_CONF
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [dynamicNavItems, setDynamicNavItems] = useState(navItems);
+  const headerRef = useRef(null);
 
   useEffect(() => {
     async function fetchCategories() {
@@ -113,11 +114,25 @@ export default function Navbar({ navItems = HEADER_NAV_ITEMS, config = SITE_CONF
   }, [navItems]);
 
   useEffect(() => {
+    const updateHeaderHeight = () => {
+      if (headerRef.current) {
+        document.documentElement.style.setProperty(
+          "--header-height",
+          `${headerRef.current.offsetHeight}px`
+        );
+      }
+    };
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 25);
+      updateHeaderHeight();
     };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    updateHeaderHeight();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", updateHeaderHeight, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", updateHeaderHeight);
+    };
   }, []);
 
   // Lock body scroll when mobile drawer is open
@@ -150,7 +165,7 @@ export default function Navbar({ navItems = HEADER_NAV_ITEMS, config = SITE_CONF
   const desktopNavItems = dynamicNavItems;
 
   return (
-    <header className="w-full sticky top-0 z-50 transition-all duration-300">
+    <header ref={headerRef} className="w-full sticky top-0 z-50 transition-all duration-300">
       {/* Dynamic Multi-Message Promotional Announcement Bar */}
       <AnnouncementBar />
 
