@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Tag, CheckCircle, FolderTree, Image as ImageIcon, X } from "lucide-react";
+import { Plus, Trash2, Tag, CheckCircle, FolderTree, Image as ImageIcon, X, Edit3, Loader2 } from "lucide-react";
 import { IKContext, IKUpload } from "imagekitio-react";
-import { collection, getDocs, addDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, addDoc, deleteDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 const authenticator = async () => {
@@ -31,6 +31,17 @@ export default function AdminCategoriesPage() {
   const [parentCategory, setParentCategory] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState(false);
+
+  // Edit Category state
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [editName, setEditName] = useState("");
+  const [editSlug, setEditSlug] = useState("");
+  const [editType, setEditType] = useState("main");
+  const [editParentCategory, setEditParentCategory] = useState("");
+  const [editImage, setEditImage] = useState("");
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [toastMessage, setToastMessage] = useState("");
 
   useEffect(() => {
     fetchCategories();
@@ -114,6 +125,90 @@ export default function AdminCategoriesPage() {
       } catch (error) {
         console.warn("Notice: Deleting category:", error?.message || error);
       }
+    }
+  };
+
+  const handleOpenEdit = (category) => {
+    setEditingCategory(category);
+    setEditName(category.name || "");
+    setEditSlug(category.slug || "");
+    setEditType(category.type || (category.isSubcategory ? "sub" : "main"));
+    setEditParentCategory(category.parentCategory || "");
+    setEditImage(category.image || "");
+    setEditError("");
+  };
+
+  const handleCloseEdit = () => {
+    setEditingCategory(null);
+    setEditName("");
+    setEditSlug("");
+    setEditType("main");
+    setEditParentCategory("");
+    setEditImage("");
+    setEditError("");
+  };
+
+  const handleUpdateCategory = async (e) => {
+    e.preventDefault();
+    if (!editingCategory) return;
+    if (!editName.trim()) {
+      setEditError("Category name cannot be empty.");
+      return;
+    }
+    if (editType === "sub" && !editParentCategory) {
+      setEditError("Please select a parent category for the subcategory.");
+      return;
+    }
+
+    const cleanSlug = editSlug.trim().toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || 
+      editName.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+    setIsUpdating(true);
+    setEditError("");
+
+    try {
+      const oldSlug = editingCategory.slug;
+      const isMainCat = editingCategory.type === "main" || (!editingCategory.type && !editingCategory.isSubcategory);
+
+      // Update in Firestore
+      await updateDoc(doc(db, "categories", editingCategory.id), {
+        name: editName.trim(),
+        slug: cleanSlug,
+        image: editImage || null,
+        type: editType,
+        isSubcategory: editType === "sub",
+        parentCategory: editType === "sub" ? editParentCategory : null,
+        updatedAt: serverTimestamp()
+      });
+
+      // If main category slug was changed, cascade update all child subcategories
+      if (isMainCat && oldSlug && cleanSlug !== oldSlug) {
+        const subcategoriesToUpdate = categories.filter(
+          c => (c.type === "sub" || c.isSubcategory) && c.parentCategory === oldSlug
+        );
+        for (const sub of subcategoriesToUpdate) {
+          try {
+            await updateDoc(doc(db, "categories", sub.id), {
+              parentCategory: cleanSlug,
+              updatedAt: serverTimestamp()
+            });
+          } catch (err) {
+            console.error("Failed to update child subcategory parentCategory", err);
+          }
+        }
+      }
+
+      await fetchCategories();
+      setToastMessage(`"${editName.trim()}" category updated successfully!`);
+      setTimeout(() => setToastMessage(""), 3500);
+      handleCloseEdit();
+    } catch (error) {
+      console.error("Error updating category:", error);
+      setEditError("Failed to update: " + (error?.message || "Please check Firestore permissions"));
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -310,13 +405,22 @@ export default function AdminCategoriesPage() {
                             <p className="text-xs text-stone-500 font-mono">{mainCat.slug}</p>
                           </div>
                         </div>
-                        <button
-                          onClick={() => handleDeleteCategory(mainCat.id)}
-                          className="p-2 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                          title="Delete Main Category"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleOpenEdit(mainCat)}
+                            className="p-2 text-stone-400 hover:text-[#C5832B] hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                            title="Edit Main Category"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCategory(mainCat.id)}
+                            className="p-2 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Main Category"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
 
                       {children.length > 0 ? (
@@ -336,13 +440,22 @@ export default function AdminCategoriesPage() {
                                   <p className="text-[10px] text-stone-500 font-mono">{subCat.slug}</p>
                                 </div>
                               </div>
-                              <button
-                                onClick={() => handleDeleteCategory(subCat.id)}
-                                className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                title="Delete Subcategory"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleOpenEdit(subCat)}
+                                  className="p-1.5 text-stone-400 hover:text-[#C5832B] hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Edit Subcategory"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCategory(subCat.id)}
+                                  className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Delete Subcategory"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -377,9 +490,22 @@ export default function AdminCategoriesPage() {
                           <p className="text-[10px] text-stone-500 font-mono">{occ.slug}</p>
                         </div>
                       </div>
-                      <button onClick={() => handleDeleteCategory(occ.id)} className="p-2 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleOpenEdit(occ)}
+                          className="p-2 text-stone-400 hover:text-[#C5832B] hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Occasion"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCategory(occ.id)}
+                          className="p-2 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          title="Delete Occasion"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -406,9 +532,22 @@ export default function AdminCategoriesPage() {
                           <p className="text-[10px] text-stone-500 font-mono">{fab.slug}</p>
                         </div>
                       </div>
-                      <button onClick={() => handleDeleteCategory(fab.id)} className="p-2 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleOpenEdit(fab)}
+                          className="p-2 text-stone-400 hover:text-[#C5832B] hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Fabric"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCategory(fab.id)}
+                          className="p-2 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          title="Delete Fabric"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -435,9 +574,22 @@ export default function AdminCategoriesPage() {
                           <p className="text-[10px] text-stone-500 font-mono">{col.slug}</p>
                         </div>
                       </div>
-                      <button onClick={() => handleDeleteCategory(col.id)} className="p-2 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleOpenEdit(col)}
+                          className="p-2 text-stone-400 hover:text-[#C5832B] hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Collection"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCategory(col.id)}
+                          className="p-2 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          title="Delete Collection"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -447,6 +599,228 @@ export default function AdminCategoriesPage() {
           </div>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl bg-stone-900 text-stone-100 shadow-2xl border border-stone-700 flex items-center gap-2.5 text-xs font-semibold animate-in slide-in-from-bottom-2">
+          <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Edit Category Modal */}
+      {editingCategory && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white max-w-lg w-full rounded-3xl p-6 sm:p-7 shadow-2xl border border-amber-900/10 space-y-5 animate-in fade-in zoom-in-95 my-8">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-stone-200">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-[#3E0C15]">
+                  <Edit3 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-serif font-bold text-lg text-stone-900">Edit Category</h3>
+                  <p className="text-xs text-stone-500">Update name, slug, image and hierarchy</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseEdit}
+                className="p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-full transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {editError && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+                {editError}
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateCategory} className="space-y-4">
+              {/* Category Type */}
+              <div>
+                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
+                  Category Type
+                </label>
+                <select
+                  value={editType}
+                  onChange={(e) => {
+                    setEditType(e.target.value);
+                    if (e.target.value !== "sub") setEditParentCategory("");
+                  }}
+                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#C5832B]"
+                >
+                  <option value="main">Main Category</option>
+                  <option value="sub">Subcategory</option>
+                  <option value="occasion">Occasion</option>
+                  <option value="fabric">Fabric</option>
+                  <option value="collection">Collection</option>
+                </select>
+              </div>
+
+              {/* If Subcategory: Select Parent Category */}
+              {editType === "sub" && (
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
+                    Select Parent Category
+                  </label>
+                  <select
+                    value={editParentCategory}
+                    onChange={(e) => setEditParentCategory(e.target.value)}
+                    required={editType === "sub"}
+                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#C5832B]"
+                  >
+                    <option value="" disabled>-- Select Main Category --</option>
+                    {mainCategories
+                      .filter(m => m.id !== editingCategory.id)
+                      .map(main => (
+                        <option key={main.id} value={main.slug}>{main.name}</option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Name */}
+              <div>
+                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
+                  Category Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-[#C5832B]"
+                  placeholder="e.g. Banarasi Silks"
+                />
+              </div>
+
+              {/* Slug */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider">
+                    Slug / URL Identifier
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const auto = editName.toLowerCase().trim()
+                        .replace(/[^a-z0-9]+/g, "-")
+                        .replace(/^-+|-+$/g, "");
+                      setEditSlug(auto);
+                    }}
+                    className="text-[10px] text-[#C5832B] hover:underline font-semibold cursor-pointer"
+                  >
+                    Auto-generate from Name
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  required
+                  value={editSlug}
+                  onChange={(e) => setEditSlug(e.target.value)}
+                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-mono text-stone-800 focus:outline-none focus:border-[#C5832B]"
+                  placeholder="e.g. banarasi-silks"
+                />
+                <p className="text-[10px] text-stone-500 mt-1">{`Used in category URLs: /collections/${editSlug || "category-slug"}`}</p>
+              </div>
+
+              {/* Image Upload / Preview */}
+              <div>
+                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">
+                  Category Image
+                </label>
+                
+                <IKContext 
+                  publicKey={process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY} 
+                  urlEndpoint={process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT} 
+                  authenticator={authenticator}
+                >
+                  <div className="flex flex-col gap-3">
+                    {editImage ? (
+                      <div className="relative w-full h-36 rounded-2xl overflow-hidden border border-stone-200 group bg-stone-100">
+                        <img src={editImage} alt="Category Preview" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditImage("")}
+                            className="bg-white/95 text-rose-600 px-3.5 py-1.5 rounded-full text-xs font-semibold hover:bg-white transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Remove Image
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-stone-300 border-dashed rounded-2xl cursor-pointer bg-stone-50 hover:bg-stone-100 transition-colors">
+                        <div className="flex flex-col items-center justify-center py-4">
+                          <ImageIcon className="w-6 h-6 text-stone-400 mb-1" />
+                          <p className="text-xs text-stone-600 font-semibold">Upload Image via ImageKit</p>
+                          <p className="text-[10px] text-stone-400 mt-0.5">PNG, JPG, WEBP</p>
+                        </div>
+                        <IKUpload
+                          className="hidden"
+                          fileName={`cat-${editSlug || "image"}`}
+                          tags={["category"]}
+                          useUniqueFileName={true}
+                          isPrivateFile={false}
+                          onSuccess={(res) => setEditImage(res.url)}
+                          onError={(err) => {
+                            console.error("Image upload failed", err);
+                            alert("Image upload failed: " + (err?.message || "Check ImageKit configuration"));
+                          }}
+                        />
+                      </label>
+                    )}
+
+                    {/* Direct URL input fallback */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="url"
+                        placeholder="Or paste image URL directly..."
+                        value={editImage}
+                        onChange={(e) => setEditImage(e.target.value)}
+                        className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-3 py-1.5 text-xs text-stone-700 focus:outline-none focus:border-[#C5832B]"
+                      />
+                    </div>
+                  </div>
+                </IKContext>
+              </div>
+
+              {/* Modal Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-stone-200">
+                <button
+                  type="button"
+                  onClick={handleCloseEdit}
+                  disabled={isUpdating}
+                  className="px-4 py-2 rounded-xl border border-stone-300 text-stone-700 text-xs font-semibold hover:bg-stone-50 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdating}
+                  className="px-5 py-2 rounded-xl bg-[#3E0C15] text-[#F3E5C8] text-xs font-bold hover:bg-[#571520] transition-colors shadow-md disabled:opacity-60 flex items-center gap-2 cursor-pointer"
+                >
+                  {isUpdating ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving Changes...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>Update Category</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
