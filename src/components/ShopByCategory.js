@@ -129,12 +129,12 @@ export default function ShopByCategory() {
               className="group flex flex-col bg-white rounded-2xl overflow-hidden border border-amber-900/10 hover:border-[#3E0C15] hover:shadow-xl transition-all duration-300 relative"
             >
               {/* Category Image Box */}
-              <div className="relative aspect-[3/4] w-full overflow-hidden bg-stone-100">
+              <div className="relative aspect-square w-full overflow-hidden bg-stone-100">
                 <Image
                   src={cat.image || "/placeholder.jpg"}
                   alt={cat.name}
                   fill
-                  className="object-cover object-center group-hover:scale-110 transition-transform duration-700 ease-out"
+                  className="object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out"
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                 />
 
