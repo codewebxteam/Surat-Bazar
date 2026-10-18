@@ -10,8 +10,10 @@ export default function ProtectedRoute({ children }) {
 
   useEffect(() => {
     if (!loading && !user) {
-      // Not logged in, redirect to login
-      router.push("/login");
+      // Not logged in, redirect to login with redirect param
+      const path = typeof window !== "undefined" ? window.location.pathname + window.location.search : "";
+      const redirectUrl = path && path !== "/login" ? `/login?redirect=${encodeURIComponent(path)}` : "/login";
+      router.push(redirectUrl);
     }
   }, [user, loading, router]);
 

@@ -35,9 +35,11 @@ export default function ProductCard({ product }) {
   const handleQuickAdd = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    addToCart(product, 1, selectedBlouse);
-    setAddedAnimation(true);
-    setTimeout(() => setAddedAnimation(false), 1500);
+    const added = addToCart(product, 1, selectedBlouse);
+    if (added) {
+      setAddedAnimation(true);
+      setTimeout(() => setAddedAnimation(false), 1500);
+    }
   };
 
   // Handle Wishlist Click - strictly prevents card link navigation

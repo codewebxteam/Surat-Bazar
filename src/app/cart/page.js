@@ -20,11 +20,13 @@ import {
   Loader2
 } from "lucide-react";
 import { useCartWishlist } from "@/context/CartWishlistContext";
+import { useAuth } from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { getPromotionsData, calculateCouponDiscount } from "@/lib/promotions";
 
 export default function CartPage() {
+  const { user } = useAuth();
   const { 
     cart, 
     updateQuantity, 
@@ -412,11 +414,11 @@ export default function CartPage() {
 
                   {/* Proceed to Checkout CTA Button */}
                   <Link
-                    href="/checkout"
+                    href={user ? "/checkout" : "/login?redirect=/checkout"}
                     id="cart-proceed-to-checkout"
                     className="mt-6 w-full py-4 rounded-full bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-500 text-stone-950 font-bold text-sm flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 text-center cursor-pointer"
                   >
-                    <span>Proceed to Checkout</span>
+                    <span>{user ? "Proceed to Checkout" : "Sign In to Checkout"}</span>
                     <ArrowRight className="w-4 h-4" />
                   </Link>
 
@@ -432,22 +434,45 @@ export default function CartPage() {
             /* Empty Cart State with START SHOPPING CTA */
             <div className="bg-white rounded-3xl border border-amber-900/10 p-12 sm:p-16 text-center max-w-lg mx-auto shadow-sm">
               <div className="w-20 h-20 rounded-full bg-amber-50 text-amber-800 flex items-center justify-center mx-auto mb-5 border border-amber-200/60 shadow-inner">
-                <ShoppingBag className="w-10 h-10" />
+                {user ? <ShoppingBag className="w-10 h-10" /> : <Lock className="w-10 h-10 text-amber-900" />}
               </div>
               <h3 className="font-serif-luxury text-2xl sm:text-3xl font-semibold text-stone-900">
-                Your Shopping Bag is Empty
+                {!user ? "Please Sign In to Access Your Bag" : "Your Shopping Bag is Empty"}
               </h3>
               <p className="text-xs sm:text-sm text-stone-500 mt-2.5 max-w-sm mx-auto leading-relaxed">
-                Explore our royal bridal collections, pure Banarasi silks, and featherlight organza drapes to fill your shopping bag.
+                {!user
+                  ? "Sign in to your Patron account to view your saved heirlooms, add exclusive collections, and enjoy tailored royal privileges."
+                  : "Explore our royal bridal collections, pure Banarasi silks, and featherlight organza drapes to fill your shopping bag."}
               </p>
-              <Link
-                href="/collections/sarees"
-                id="empty-cart-start-shopping"
-                className="mt-8 inline-flex items-center gap-2 px-10 py-4 rounded-full bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] text-xs uppercase tracking-widest font-bold transition-all shadow-xl active:scale-95 cursor-pointer"
-              >
-                <span>START SHOPPING</span>
-                <ArrowRight className="w-4 h-4" />
-              </Link>
+              <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+                {!user ? (
+                  <>
+                    <Link
+                      href="/login?redirect=/cart"
+                      id="cart-login-cta"
+                      className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] text-xs uppercase tracking-widest font-bold transition-all shadow-xl active:scale-95 cursor-pointer"
+                    >
+                      <span>SIGN IN TO BAG</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </Link>
+                    <Link
+                      href="/collections/sarees"
+                      className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full border border-stone-300 hover:border-stone-800 text-stone-700 text-xs uppercase tracking-widest font-bold transition-all active:scale-95"
+                    >
+                      <span>EXPLORE SAREES</span>
+                    </Link>
+                  </>
+                ) : (
+                  <Link
+                    href="/collections/sarees"
+                    id="empty-cart-start-shopping"
+                    className="inline-flex items-center gap-2 px-10 py-4 rounded-full bg-[#3E0C15] hover:bg-[#571520] text-[#F7EFCF] text-xs uppercase tracking-widest font-bold transition-all shadow-xl active:scale-95 cursor-pointer"
+                  >
+                    <span>START SHOPPING</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                )}
+              </div>
             </div>
           )}
 

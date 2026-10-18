@@ -37,6 +37,7 @@ import {
   Minimize2
 } from "lucide-react";
 import { useCartWishlist } from "@/context/CartWishlistContext";
+import { useAuth } from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ProductCard from "@/components/ProductCard";
@@ -78,7 +79,8 @@ export default function ProductDetailPage({ params }) {
     fetchProductData();
   }, [slug]);
 
-  const { addToCart, toggleWishlist, isInWishlist, appliedCoupon, applyCoupon } = useCartWishlist();
+  const { user } = useAuth();
+  const { addToCart, toggleWishlist, isInWishlist, appliedCoupon, applyCoupon, showToast } = useCartWishlist();
   const wishlisted = product ? isInWishlist(product.id) : false;
 
   // Dynamic offers from Admin Settings / Promotions
@@ -267,15 +269,24 @@ export default function ProductDetailPage({ params }) {
   };
 
   const handleAddToCart = () => {
-    addToCart(product, quantity, blouseOption);
-    setAddedToast(true);
-    setTimeout(() => setAddedToast(false), 2000);
+    const added = addToCart(product, quantity, blouseOption);
+    if (added) {
+      setAddedToast(true);
+      setTimeout(() => setAddedToast(false), 2000);
+    }
   };
 
   const handleBuyNow = (e) => {
     e?.preventDefault();
-    addToCart(product, quantity, blouseOption);
-    router.push("/checkout");
+    if (!user) {
+      showToast("Please log in to proceed with your order 🔒");
+      router.push(`/login?redirect=${encodeURIComponent(`/product/${product.slug}`)}`);
+      return;
+    }
+    const added = addToCart(product, quantity, blouseOption);
+    if (added) {
+      router.push("/checkout");
+    }
   };
 
   // Color variants for demo

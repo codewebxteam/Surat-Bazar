@@ -35,6 +35,14 @@ function LoginForm() {
 
   const router = useRouter();
   const { user: currentUser, role: currentRole, loading: authLoading } = useAuth();
+  const [redirectParam, setRedirectParam] = useState(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      setRedirectParam(params.get("redirect"));
+    }
+  }, []);
 
   // If already logged in, redirect appropriately
   useEffect(() => {
@@ -43,7 +51,10 @@ function LoginForm() {
       if (isAdmin) {
         router.push("/admin");
       } else {
-        router.push("/");
+        const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+        const param = params?.get("redirect");
+        const destination = param && param.startsWith("/") ? param : "/";
+        router.push(destination);
       }
     }
   }, [currentUser, currentRole, authLoading, router]);
@@ -219,6 +230,14 @@ function LoginForm() {
 
         {/* Form Body Container */}
         <div className="p-6 sm:p-8">
+          {/* Informational Redirect Banner */}
+          {redirectParam && (
+            <div className="mb-5 bg-amber-50 border border-amber-300/80 text-amber-900 px-3.5 py-2.5 rounded-xl text-xs flex items-center gap-2">
+              <Lock className="w-4 h-4 text-amber-800 shrink-0" />
+              <span className="font-medium">Please sign in to add items to your Bag and continue shopping.</span>
+            </div>
+          )}
+
           {/* Error Alert */}
           {error && (
             <motion.div 
@@ -341,7 +360,10 @@ function LoginForm() {
           <div className="mt-6 pt-5 border-t border-stone-200 text-center">
             <p className="text-xs text-stone-600">
               New to Suratbazar?{" "}
-              <Link href="/register" className="font-bold text-[#3E0C15] hover:underline underline-offset-4">
+              <Link 
+                href={redirectParam ? `/register?redirect=${encodeURIComponent(redirectParam)}` : "/register"} 
+                className="font-bold text-[#3E0C15] hover:underline underline-offset-4"
+              >
                 Create Patron Account
               </Link>
             </p>

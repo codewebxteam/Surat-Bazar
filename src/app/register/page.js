@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   Mail, 
@@ -30,7 +30,15 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [redirectParam, setRedirectParam] = useState(null);
   const router = useRouter();
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      setRedirectParam(params.get("redirect"));
+    }
+  }, []);
 
   const handleEmailRegister = async (e) => {
     e.preventDefault();
@@ -69,8 +77,9 @@ export default function Register() {
         } catch (_) {}
       }
 
-      // 4. Redirect to home or account page
-      router.push("/");
+      // 4. Redirect to target or home
+      const destination = redirectParam && redirectParam.startsWith("/") ? redirectParam : "/";
+      router.push(destination);
     } catch (err) {
       console.error("Registration error:", err);
       const code = err.code || "";
@@ -246,7 +255,10 @@ export default function Register() {
           <div className="mt-6 pt-5 border-t border-stone-200 text-center">
             <p className="text-xs text-stone-600">
               Already have an account?{" "}
-              <Link href="/login" className="font-bold text-[#3E0C15] hover:underline underline-offset-4">
+              <Link 
+                href={redirectParam ? `/login?redirect=${encodeURIComponent(redirectParam)}` : "/login"} 
+                className="font-bold text-[#3E0C15] hover:underline underline-offset-4"
+              >
                 Sign in here
               </Link>
             </p>

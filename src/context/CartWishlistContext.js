@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -9,6 +10,7 @@ import { getPromotionsData, normalizeCoupon, calculateCouponDiscount } from "@/l
 const CartWishlistContext = createContext(null);
 
 export function CartWishlistProvider({ children }) {
+  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [cart, setCart] = useState([]);
   const [wishlist, setWishlist] = useState([]);
@@ -18,7 +20,7 @@ export function CartWishlistProvider({ children }) {
   // Keep track of whether data is loaded to prevent overwriting cloud data with empty array
   const isInitialized = useRef(false);
 
-  // Load from localStorage on mount (Guest Mode + Applied Coupon)
+  // Load from localStorage on mount (Guest Wishlist + Applied Coupon)
   useEffect(() => {
     try {
       const savedCoupon = localStorage.getItem("suratbazar_applied_coupon");
@@ -28,14 +30,18 @@ export function CartWishlistProvider({ children }) {
     } catch (e) {}
 
     if (!user && !authLoading) {
+      // Unauthenticated users cannot hold or add cart items
+      setCart([]);
       try {
-        const savedCart = localStorage.getItem("suratbazar_cart") || localStorage.getItem("shringaar_cart");
-        if (savedCart) setCart(JSON.parse(savedCart));
+        localStorage.removeItem("suratbazar_cart");
+        localStorage.removeItem("shringaar_cart");
+      } catch (e) {}
 
+      try {
         const savedWishlist = localStorage.getItem("suratbazar_wishlist") || localStorage.getItem("shringaar_wishlist");
         if (savedWishlist) setWishlist(JSON.parse(savedWishlist));
       } catch (e) {
-        console.error("Failed to load local cart/wishlist", e);
+        console.error("Failed to load local wishlist", e);
       }
       isInitialized.current = true;
     }
@@ -67,23 +73,19 @@ export function CartWishlistProvider({ children }) {
         unsubscribeCart();
         unsubscribeWishlist();
       };
+    } else {
+      // Clear cart on logout
+      setCart([]);
     }
   }, [user]);
 
-  // Save Cart to LocalStorage OR Firestore whenever it changes
+  // Save Cart to Firestore whenever it changes (Logged-in only)
   useEffect(() => {
     if (!isInitialized.current) return; // Prevent saving empty initial state
 
     if (user) {
       // Save to Firestore
       setDoc(doc(db, "carts", user.uid), { items: cart }).catch(console.error);
-    } else {
-      // Save to localStorage
-      try {
-        localStorage.setItem("suratbazar_cart", JSON.stringify(cart));
-      } catch (e) {
-        console.error("Failed to save cart locally", e);
-      }
     }
   }, [cart, user]);
 
@@ -108,10 +110,19 @@ export function CartWishlistProvider({ children }) {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage(null);
-    }, 3000);
+    }, 3500);
   };
 
   const addToCart = (product, quantity = 1, blouseOption = "unstitched") => {
+    if (!user) {
+      showToast("Please log in to add items to your Bag 🔒");
+      if (typeof window !== "undefined") {
+        const currentPath = window.location.pathname + window.location.search;
+        router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
+      }
+      return false;
+    }
+
     setCart((prev) => {
       const existingIndex = prev.findIndex(
         (item) => item.id === product.id && item.blouseOption === blouseOption
@@ -124,6 +135,7 @@ export function CartWishlistProvider({ children }) {
       return [...prev, { ...product, quantity, blouseOption }];
     });
     showToast(`Added "${product.name}" to Bag! 🛍️`);
+    return true;
   };
 
   const removeFromCart = (id, blouseOption) => {
