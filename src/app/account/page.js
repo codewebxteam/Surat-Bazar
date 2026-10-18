@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { 
@@ -12,6 +12,7 @@ import {
   ShieldCheck, 
   Phone, 
   ChevronRight,
+  ChevronUp,
   Sparkles,
   Truck,
   RotateCcw,
@@ -26,7 +27,6 @@ import { auth, db } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import { useCartWishlist } from "@/context/CartWishlistContext";
 import ProductCard from "@/components/ProductCard";
 import Navbar from "@/components/Navbar";
@@ -35,9 +35,27 @@ import LogoutConfirmModal from "@/components/LogoutConfirmModal";
 
 export default function AccountPage() {
   const [activeTab, setActiveTab] = useState("profile"); // "profile" | "orders" | "wishlist" | "addresses" | "track" | "returns"
+  const contentRef = useRef(null);
   const { wishlist } = useCartWishlist();
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+
+  const handleTabClick = (tabId) => {
+    setActiveTab(tabId);
+    // Smoothly scroll down so the user is directly taken to the opened data
+    setTimeout(() => {
+      if (contentRef.current) {
+        const navbarHeight = 75; // Account for fixed top navbar on mobile
+        const elementPosition = contentRef.current.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.scrollY - navbarHeight;
+
+        window.scrollTo({
+          top: Math.max(0, offsetPosition),
+          behavior: "smooth"
+        });
+      }
+    }, 50);
+  };
 
   const [userData, setUserData] = useState(null);
   const [orders, setOrders] = useState([]);
@@ -213,7 +231,7 @@ export default function AccountPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             
             {/* Sidebar Tabs (3 cols) with Profile, Orders, Wishlist, Addresses, Track Order, Returns, Logout */}
-            <div className="lg:col-span-3 space-y-1.5 bg-white p-3 rounded-2xl border border-amber-900/10 shadow-sm sticky top-28">
+            <div id="account-sidebar-tabs" className="lg:col-span-3 space-y-1.5 bg-white p-3 rounded-2xl border border-amber-900/10 shadow-sm lg:sticky lg:top-28">
               {[
                 { id: "profile", label: "My Profile", icon: User },
                 { id: "orders", label: "My Orders", icon: Package },
@@ -226,7 +244,7 @@ export default function AccountPage() {
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => handleTabClick(tab.id)}
                     className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                       activeTab === tab.id
                         ? "bg-[#3E0C15] text-[#F7EFCF] shadow-sm font-bold"
@@ -254,7 +272,33 @@ export default function AccountPage() {
             </div>
 
             {/* Right Tab Content (9 cols) */}
-            <div className="lg:col-span-9 bg-white rounded-3xl border border-amber-900/10 p-6 sm:p-8 shadow-sm">
+            <div 
+              ref={contentRef} 
+              id="account-tab-content" 
+              className="lg:col-span-9 bg-white rounded-3xl border border-amber-900/10 p-6 sm:p-8 shadow-sm scroll-mt-24"
+            >
+              {/* Mobile quick button to scroll back to tabs menu */}
+              <div className="lg:hidden flex items-center justify-between pb-3 mb-5 border-b border-stone-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const tabsElement = document.getElementById("account-sidebar-tabs");
+                    if (tabsElement) {
+                      const offset = tabsElement.getBoundingClientRect().top + window.scrollY - 75;
+                      window.scrollTo({ top: Math.max(0, offset), behavior: "smooth" });
+                    } else {
+                      window.scrollTo({ top: 100, behavior: "smooth" });
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 text-xs text-[#3E0C15] font-semibold bg-amber-50 hover:bg-amber-100 px-3.5 py-1.5 rounded-full border border-amber-200 transition-colors cursor-pointer"
+                >
+                  <ChevronUp className="w-3.5 h-3.5" />
+                  <span>Switch Section / Back to Menu</span>
+                </button>
+                <span className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
+                  {activeTab}
+                </span>
+              </div>
               
               {/* TAB 1: PROFILE */}
               {activeTab === "profile" && (
