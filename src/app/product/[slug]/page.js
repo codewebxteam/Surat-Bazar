@@ -331,7 +331,7 @@ export default function ProductDetailPage({ params }) {
                       src={img}
                       alt={`${product.name} thumbnail ${idx + 1}`}
                       fill
-                      className="object-cover"
+                      className="object-cover object-top"
                     />
                   </button>
                 ))}
@@ -365,7 +365,7 @@ export default function ProductDetailPage({ params }) {
                   alt={product.name}
                   fill
                   priority
-                  className={`object-cover object-center transition-transform duration-200 pointer-events-none ${
+                  className={`object-cover object-top transition-transform duration-200 pointer-events-none ${
                     isZoomed ? "scale-150 hidden sm:block" : "scale-100"
                   }`}
                   style={

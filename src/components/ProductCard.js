@@ -82,7 +82,7 @@ export default function ProductCard({ product }) {
       <div className="group bg-white rounded-xl sm:rounded-2xl overflow-hidden border border-amber-900/10 hover:border-amber-500/30 hover:shadow-xl transition-all duration-300 flex flex-col h-full relative">
         
         {/* Top Image Container - Compact & responsive */}
-        <div className="relative aspect-[4/5] sm:aspect-[3/4] w-full overflow-hidden bg-stone-100">
+        <div className="relative aspect-[3/4] w-full overflow-hidden bg-stone-100">
           <Link 
             href={`/product/${product.slug}`} 
             className="block w-full h-full relative cursor-pointer"
@@ -92,7 +92,7 @@ export default function ProductCard({ product }) {
               src={product.images[activeImageIndex] || product.images[0]}
               alt={product.name}
               fill
-              className="object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out"
+              className="object-cover object-top group-hover:scale-105 transition-transform duration-700 ease-out"
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             />
 
@@ -102,7 +102,7 @@ export default function ProductCard({ product }) {
                 src={product.images[1]}
                 alt={`${product.name} alternate angle`}
                 fill
-                className="object-cover object-center opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-out"
+                className="object-cover object-top opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-out"
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               />
             )}
@@ -289,7 +289,7 @@ export default function ProductCard({ product }) {
                       src={product.images[activeImageIndex] || product.images[0]}
                       alt={product.name}
                       fill
-                      className="object-cover"
+                      className="object-cover object-top"
                       sizes="(max-width: 768px) 100vw, 50vw"
                     />
                   </div>
