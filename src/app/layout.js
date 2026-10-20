@@ -21,6 +21,17 @@ const jakarta = Plus_Jakarta_Sans({
 export const metadata = {
   title: "Suratbazar | Surat's Finest Handcrafted Sarees & Silk Emporium",
   description: "Discover timeless Banarasi, Kanjeevaram, Paithani, Organza, and festive wedding drapes directly from Surat's premier silk treasury.",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", sizes: "32x32", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: [
+      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
 };
 
 export default function RootLayout({ children }) {
